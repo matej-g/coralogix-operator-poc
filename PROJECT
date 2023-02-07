@@ -1,0 +1,16 @@
+domain: coralogix
+layout:
+- go.kubebuilder.io/v3
+projectName: coralogix-operator-poc
+repo: coralogix-operator-poc
+resources:
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: coralogix
+  group: coralogix
+  kind: RuleGroup
+  path: coralogix-operator-poc/api/v1
+  version: v1
+version: "3"
