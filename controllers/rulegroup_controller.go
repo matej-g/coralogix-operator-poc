@@ -21,6 +21,8 @@ import (
 	"time"
 
 	"coralogix-operator-poc/controllers/clientset"
+	rulesgroups "coralogix-operator-poc/controllers/clientset/grpc/rules-groups/v1"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -73,7 +75,21 @@ func (r *RuleGroupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return ctrl.Result{RequeueAfter: defaultErrRequeuePeriod}, err
 	}
 
-	_ = instance.Status.DeepCopy()
+	getRuleGroupReq := &rulesgroups.GetRuleGroupRequest{
+		GroupId: instance.Status.ID,
+	}
+	actualState, err := r.coralogixClientSet.RuleGroups().GetRuleGroup(ctx, getRuleGroupReq)
+	if err != nil {
+		return ctrl.Result{RequeueAfter: defaultErrRequeuePeriod}, err
+	}
+
+	if !instance.Spec.DeepEqual(actualState.RuleGroup) {
+		updateRuleGroupReq := &rulesgroups.UpdateRuleGroupRequest{
+			GroupId: wrapperspb.String(instance.Status.ID),
+			//TODO convert from spec to update request
+		}
+		r.coralogixClientSet.RuleGroups().UpdateRuleGroup(ctx, updateRuleGroupReq)
+	}
 
 	return ctrl.Result{}, nil
 }
