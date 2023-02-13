@@ -19,6 +19,7 @@ package v1
 import (
 	utils "coralogix-operator-poc/controllers"
 	rulesgroups "coralogix-operator-poc/controllers/clientset/grpc/rules-groups/v1"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -59,7 +60,7 @@ type Rule struct {
 	Name string `json:"name,omitempty"`
 
 	// +optional
-	Description *string `json:"description,omitempty"`
+	Description string `json:"description,omitempty"`
 
 	//+kubebuilder:default=true
 	Active bool `json:"active,omitempty"`
@@ -102,7 +103,7 @@ func (in *Rule) DeepEqual(rule *rulesgroups.Rule) bool {
 	if in.Order == nil || *in.Order != rule.Order.GetValue() {
 		return false
 	}
-	if (in.Description == nil && rule.Description != nil) || (*in.Description != rule.Description.GetValue()) {
+	if in.Description != rule.Description.GetValue() {
 		return false
 	}
 	if in.Name != rule.Name.GetValue() {
@@ -149,8 +150,7 @@ func (in *Rule) DeepEqualRuleType(parameters *rulesgroups.Rule) bool {
 			if replaceParameters.ReplacementString != actualReplaceParameters.ReplaceNewVal.GetValue() {
 				return false
 			}
-			if rulesSchemaDestinationFieldToProtoSeverityDestinationField[replaceParameters.DestinationField] !=
-				actualReplaceParameters.DestinationField.String() {
+			if replaceParameters.DestinationField != actualReplaceParameters.DestinationField.String() {
 				return false
 			}
 			if replaceParameters.RegularExpression != actualReplaceParameters.Rule.GetValue() {
@@ -235,8 +235,7 @@ func (in *Rule) DeepEqualRuleType(parameters *rulesgroups.Rule) bool {
 			if jsonStringifyParameters.KeepSourceField == actualJsonStringifyParameters.DeleteSource.GetValue() {
 				return false
 			}
-			if rulesSchemaDestinationFieldToProtoSeverityDestinationField[jsonStringifyParameters.DestinationField] !=
-				actualJsonStringifyParameters.DestinationField.String() {
+			if jsonStringifyParameters.DestinationField != actualJsonStringifyParameters.DestinationField.String() {
 				return false
 			}
 			if jsonStringifyParameters.SourceField != parameters.SourceField.GetValue() {
@@ -297,7 +296,7 @@ type JsonExtract struct {
 type Replace struct {
 	SourceField string `json:"sourceField,omitempty"`
 
-	DestinationField DestinationField `json:"destinationField,omitempty"`
+	DestinationField string `json:"destinationField,omitempty"`
 
 	RegularExpression string `json:"regularExpression,omitempty"`
 
@@ -322,7 +321,7 @@ type RemoveFields struct {
 type JsonStringify struct {
 	SourceField string `json:"sourceField,omitempty"`
 
-	DestinationField DestinationField `json:"destinationField,omitempty"`
+	DestinationField string `json:"destinationField,omitempty"`
 
 	//+kubebuilder:default=false
 	KeepSourceField bool `json:"keepSourceField,omitempty"`
@@ -344,7 +343,7 @@ type ParseJsonField struct {
 	KeepDestinationField bool `json:"keepDestinationField,omitempty"`
 }
 
-type RuleSubgroup struct {
+type RuleSubGroup struct {
 	//+kubebuilder:default=true
 	Active bool `json:"active,omitempty"`
 
@@ -355,7 +354,7 @@ type RuleSubgroup struct {
 	Rules []Rule `json:"rules,omitempty"`
 }
 
-func (in *RuleSubgroup) DeepEqual(subgroup *rulesgroups.RuleSubgroup) bool {
+func (in *RuleSubGroup) DeepEqual(subgroup *rulesgroups.RuleSubgroup) bool {
 	if in.Active != subgroup.Enabled.GetValue() {
 		return false
 	}
@@ -409,7 +408,7 @@ type RuleGroupSpec struct {
 	Order *uint32 `json:"order,omitempty"`
 
 	// +optional
-	RuleSubgroups []RuleSubgroup `json:"ruleSubgroups,omitempty"`
+	RuleSubgroups []RuleSubGroup `json:"ruleSubgroups,omitempty"`
 }
 
 func (in *RuleGroupSpec) DeepEqual(actualState *rulesgroups.RuleGroup) bool {
@@ -461,6 +460,234 @@ func (in *RuleGroupSpec) DeepEqual(actualState *rulesgroups.RuleGroup) bool {
 	}
 
 	return true
+}
+
+func (in *RuleGroupSpec) ExtractUpdateRuleGroupRequest(id string) *rulesgroups.UpdateRuleGroupRequest {
+	ruleGroup := in.ExtractCreateRuleGroupRequest()
+	return &rulesgroups.UpdateRuleGroupRequest{
+		GroupId:   wrapperspb.String(id),
+		RuleGroup: ruleGroup,
+	}
+}
+
+func (in *RuleGroupSpec) ExtractCreateRuleGroupRequest() *rulesgroups.CreateRuleGroupRequest {
+	name := wrapperspb.String(in.Name)
+	description := wrapperspb.String(in.Description)
+	enabled := wrapperspb.Bool(in.Active)
+	hidden := wrapperspb.Bool(in.Hidden)
+	creator := wrapperspb.String(in.Creator)
+	ruleMatchers := expandRuleMatchers(in.Applications, in.Subsystems, in.Severities)
+	ruleSubGroups := expandRuleSubGroups(in.RuleSubgroups)
+	order := expandOrder(in.Order)
+
+	return &rulesgroups.CreateRuleGroupRequest{
+		Name:          name,
+		Description:   description,
+		Enabled:       enabled,
+		Hidden:        hidden,
+		Creator:       creator,
+		RuleMatchers:  ruleMatchers,
+		RuleSubgroups: ruleSubGroups,
+		Order:         order,
+	}
+}
+
+func expandOrder(order *uint32) *wrapperspb.UInt32Value {
+	if order != nil {
+		return wrapperspb.UInt32(*order)
+	}
+	return nil
+}
+
+func expandRuleSubGroups(subGroups []RuleSubGroup) []*rulesgroups.CreateRuleGroupRequest_CreateRuleSubgroup {
+	ruleSubGroups := make([]*rulesgroups.CreateRuleGroupRequest_CreateRuleSubgroup, 0, len(subGroups))
+	for _, subGroup := range subGroups {
+		rsg := expandRuleSubGroup(subGroup)
+		ruleSubGroups = append(ruleSubGroups, rsg)
+	}
+	return ruleSubGroups
+}
+
+func expandRuleSubGroup(subGroup RuleSubGroup) *rulesgroups.CreateRuleGroupRequest_CreateRuleSubgroup {
+	enabled := wrapperspb.Bool(subGroup.Active)
+	order := expandOrder(subGroup.Order)
+	rules := expandRules(subGroup.Rules)
+	return &rulesgroups.CreateRuleGroupRequest_CreateRuleSubgroup{
+		Enabled: enabled,
+		Order:   order,
+		Rules:   rules,
+	}
+}
+
+func expandRules(rules []Rule) []*rulesgroups.CreateRuleGroupRequest_CreateRuleSubgroup_CreateRule {
+	expandedRules := make([]*rulesgroups.CreateRuleGroupRequest_CreateRuleSubgroup_CreateRule, 0, len(rules))
+	for _, rule := range rules {
+		r := expandRule(rule)
+		expandedRules = append(expandedRules, r)
+	}
+	return expandedRules
+}
+
+func expandRule(rule Rule) *rulesgroups.CreateRuleGroupRequest_CreateRuleSubgroup_CreateRule {
+	name := wrapperspb.String(rule.Name)
+	description := wrapperspb.String(rule.Description)
+	enabled := wrapperspb.Bool(rule.Active)
+	sourceFiled, paramerters := expandSourceFiledAndParameters(rule)
+	order := expandOrder(rule.Order)
+
+	return &rulesgroups.CreateRuleGroupRequest_CreateRuleSubgroup_CreateRule{
+		Name:        name,
+		Description: description,
+		SourceField: sourceFiled,
+		Parameters:  paramerters,
+		Enabled:     enabled,
+		Order:       order,
+	}
+}
+
+func expandSourceFiledAndParameters(rule Rule) (sourceField *wrapperspb.StringValue, parameters *rulesgroups.RuleParameters) {
+	if parse := rule.Parse; parse != nil {
+		sourceField = wrapperspb.String(parse.SourceField)
+		parameters = &rulesgroups.RuleParameters{
+			RuleParameters: &rulesgroups.RuleParameters_ParseParameters{
+				ParseParameters: &rulesgroups.ParseParameters{
+					DestinationField: wrapperspb.String(parse.DestinationField),
+					Rule:             wrapperspb.String(parse.RegularExpression),
+				},
+			},
+		}
+	} else if parseJsonField := rule.ParseJsonField; parseJsonField != nil {
+		sourceField = wrapperspb.String(parseJsonField.SourceField)
+		parameters = &rulesgroups.RuleParameters{
+			RuleParameters: &rulesgroups.RuleParameters_JsonParseParameters{
+				JsonParseParameters: &rulesgroups.JsonParseParameters{
+					DestinationField: wrapperspb.String(parseJsonField.DestinationField),
+					DeleteSource:     wrapperspb.Bool(!parseJsonField.KeepSourceField),
+					OverrideDest:     wrapperspb.Bool(!parseJsonField.KeepDestinationField),
+					EscapedValue:     wrapperspb.Bool(true),
+				},
+			},
+		}
+	} else if jsonStringify := rule.JsonStringify; jsonStringify != nil {
+		sourceField = wrapperspb.String(jsonStringify.SourceField)
+		parameters = &rulesgroups.RuleParameters{
+			RuleParameters: &rulesgroups.RuleParameters_JsonStringifyParameters{
+				JsonStringifyParameters: &rulesgroups.JsonStringifyParameters{
+					DestinationField: wrapperspb.String(jsonStringify.DestinationField),
+					DeleteSource:     wrapperspb.Bool(!jsonStringify.KeepSourceField),
+				},
+			},
+		}
+	} else if jsonExtract := rule.JsonExtract; jsonExtract != nil {
+		sourceField = wrapperspb.String(jsonExtract.JsonKey)
+		destinationField := expandJsonExtractDestinationField(jsonExtract.DestinationField)
+		parameters = &rulesgroups.RuleParameters{
+			RuleParameters: &rulesgroups.RuleParameters_JsonExtractParameters{
+				JsonExtractParameters: &rulesgroups.JsonExtractParameters{
+					DestinationField: destinationField,
+					Rule:             wrapperspb.String(parse.RegularExpression),
+				},
+			},
+		}
+	} else if removeFields := rule.RemoveFields; removeFields != nil {
+		parameters = &rulesgroups.RuleParameters{
+			RuleParameters: &rulesgroups.RuleParameters_RemoveFieldsParameters{
+				RemoveFieldsParameters: &rulesgroups.RemoveFieldsParameters{
+					Fields: removeFields.ExcludedFields,
+				},
+			},
+		}
+	} else if extractTimestamp := rule.ExtractTimestamp; extractTimestamp != nil {
+		sourceField = wrapperspb.String(extractTimestamp.SourceField)
+		standard := expandTimeStampStandard(extractTimestamp)
+		format := wrapperspb.String(extractTimestamp.TimeFormat)
+		parameters = &rulesgroups.RuleParameters{
+			RuleParameters: &rulesgroups.RuleParameters_ExtractTimestampParameters{
+				ExtractTimestampParameters: &rulesgroups.ExtractTimestampParameters{
+					Standard: standard,
+					Format:   format,
+				},
+			},
+		}
+	} else if block := rule.Block; block != nil {
+		sourceField = wrapperspb.String(block.SourceField)
+		if block.BlockingAllMatchingBlocks {
+			parameters = &rulesgroups.RuleParameters{
+				RuleParameters: &rulesgroups.RuleParameters_BlockParameters{
+					BlockParameters: &rulesgroups.BlockParameters{
+						KeepBlockedLogs: wrapperspb.Bool(block.KeepBlockedLogs),
+						Rule:            wrapperspb.String(block.RegularExpression),
+					},
+				},
+			}
+		} else {
+			parameters = &rulesgroups.RuleParameters{
+				RuleParameters: &rulesgroups.RuleParameters_AllowParameters{
+					AllowParameters: &rulesgroups.AllowParameters{
+						KeepBlockedLogs: wrapperspb.Bool(block.KeepBlockedLogs),
+						Rule:            wrapperspb.String(block.RegularExpression),
+					},
+				},
+			}
+		}
+	} else if replace := rule.Replace; replace != nil {
+		sourceField = wrapperspb.String(replace.SourceField)
+		parameters = &rulesgroups.RuleParameters{
+			RuleParameters: &rulesgroups.RuleParameters_ReplaceParameters{
+				ReplaceParameters: &rulesgroups.ReplaceParameters{
+					DestinationField: wrapperspb.String(replace.DestinationField),
+					ReplaceNewVal:    wrapperspb.String(replace.ReplacementString),
+					Rule:             wrapperspb.String(replace.RegularExpression),
+				},
+			},
+		}
+	}
+
+	return
+}
+
+func expandTimeStampStandard(extractTimestamp *ExtractTimestamp) rulesgroups.ExtractTimestampParameters_FormatStandard {
+	return rulesgroups.ExtractTimestampParameters_FormatStandard(
+		rulesgroups.ExtractTimestampParameters_FormatStandard_value[rulesSchemaFormatStandardToProtoFormatStandard[extractTimestamp.FieldFormatStandard]],
+	)
+}
+
+func expandJsonExtractDestinationField(destinationField DestinationField) rulesgroups.JsonExtractParameters_DestinationField {
+	return rulesgroups.JsonExtractParameters_DestinationField(
+		rulesgroups.JsonExtractParameters_DestinationField_value[rulesSchemaDestinationFieldToProtoSeverityDestinationField[destinationField]],
+	)
+}
+
+func expandRuleMatchers(applications, subsystems []string, severities []RuleGroupSeverity) []*rulesgroups.RuleMatcher {
+	ruleMatchers := make([]*rulesgroups.RuleMatcher, 0, len(applications)+len(subsystems)+len(severities))
+
+	for _, app := range applications {
+		constraintStr := wrapperspb.String(app)
+		applicationNameConstraint := rulesgroups.ApplicationNameConstraint{Value: constraintStr}
+		ruleMatcherApplicationName := rulesgroups.RuleMatcher_ApplicationName{ApplicationName: &applicationNameConstraint}
+		ruleMatchers = append(ruleMatchers, &rulesgroups.RuleMatcher{Constraint: &ruleMatcherApplicationName})
+	}
+
+	for _, subSys := range subsystems {
+		constraintStr := wrapperspb.String(subSys)
+		subsystemNameConstraint := rulesgroups.SubsystemNameConstraint{Value: constraintStr}
+		ruleMatcherApplicationName := rulesgroups.RuleMatcher_SubsystemName{SubsystemName: &subsystemNameConstraint}
+		ruleMatchers = append(ruleMatchers, &rulesgroups.RuleMatcher{Constraint: &ruleMatcherApplicationName})
+	}
+
+	for _, sev := range severities {
+		constraintEnum := expandRuledSeverity(sev)
+		severityConstraint := rulesgroups.SeverityConstraint{Value: constraintEnum}
+		ruleMatcherSeverity := rulesgroups.RuleMatcher_Severity{Severity: &severityConstraint}
+		ruleMatchers = append(ruleMatchers, &rulesgroups.RuleMatcher{Constraint: &ruleMatcherSeverity})
+	}
+
+	return ruleMatchers
+}
+
+func expandRuledSeverity(severity RuleGroupSeverity) rulesgroups.SeverityConstraint_Value {
+	sevStr := rulesSchemaSeverityToProtoSeverity[severity]
+	return rulesgroups.SeverityConstraint_Value(rulesgroups.SeverityConstraint_Value_value[sevStr])
 }
 
 func flattenRuleMatchers(matchers []*rulesgroups.RuleMatcher) (applications []string, subsystems []string, severities []RuleGroupSeverity) {
