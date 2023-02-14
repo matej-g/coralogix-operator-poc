@@ -17,7 +17,7 @@ limitations under the License.
 package v1
 
 import (
-	utils "coralogix-operator-poc/controllers"
+	utils "coralogix-operator-poc/api"
 	rulesgroups "coralogix-operator-poc/controllers/clientset/grpc/rules-groups/v1"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -66,7 +66,8 @@ type Rule struct {
 	Active bool `json:"active,omitempty"`
 
 	// +optional
-	Order *uint32 `json:"order,omitempty"`
+	// +kubebuilder:validation:Minimum:=1
+	Order *int32 `json:"order,omitempty"`
 
 	// +optional
 	Parse *Parse `json:"parse,omitempty"`
@@ -100,7 +101,7 @@ func (in *Rule) DeepEqual(rule *rulesgroups.Rule) bool {
 	if in.Active != rule.Enabled.GetValue() {
 		return false
 	}
-	if in.Order == nil || *in.Order != rule.Order.GetValue() {
+	if in.Order == nil || uint32(*in.Order) != rule.Order.GetValue() {
 		return false
 	}
 	if in.Description != rule.Description.GetValue() {
@@ -348,7 +349,8 @@ type RuleSubGroup struct {
 	Active bool `json:"active,omitempty"`
 
 	// +optional
-	Order *uint32 `json:"order,omitempty"`
+	// +kubebuilder:validation:Minimum:=1
+	Order *int32 `json:"order,omitempty"`
 
 	// +optional
 	Rules []Rule `json:"rules,omitempty"`
@@ -358,7 +360,7 @@ func (in *RuleSubGroup) DeepEqual(subgroup *rulesgroups.RuleSubgroup) bool {
 	if in.Active != subgroup.Enabled.GetValue() {
 		return false
 	}
-	if in.Order == nil || *in.Order != subgroup.Order.GetValue() {
+	if in.Order == nil || uint32(*in.Order) != subgroup.Order.GetValue() {
 		return false
 	}
 	if len(in.Rules) != len(subgroup.Rules) {
@@ -387,15 +389,15 @@ type RuleGroupSpec struct {
 	Active bool `json:"active,omitempty"`
 
 	// +optional
-	// +kubebuilder:validation:UniqueItems
+	//+kubebuilder:validation:UniqueItems=true
 	Applications []string `json:"applications,omitempty"`
 
 	// +optional
-	// +kubebuilder:validation:UniqueItems
+	//+kubebuilder:validation:UniqueItems=true
 	Subsystems []string `json:"subsystems,omitempty"`
 
 	// +optional
-	// +kubebuilder:validation:UniqueItems
+	//+kubebuilder:validation:UniqueItems=true
 	Severities []RuleGroupSeverity `json:"severities,omitempty"`
 
 	//+kubebuilder:default=false
@@ -405,7 +407,8 @@ type RuleGroupSpec struct {
 	Creator string `json:"creator,omitempty"`
 
 	// +optional
-	Order *uint32 `json:"order,omitempty"`
+	// +kubebuilder:validation:Minimum:=1
+	Order *int32 `json:"order,omitempty"`
 
 	// +optional
 	RuleSubgroups []RuleSubGroup `json:"ruleSubgroups,omitempty"`
@@ -432,7 +435,7 @@ func (in *RuleGroupSpec) DeepEqual(actualState *rulesgroups.RuleGroup) bool {
 		return false
 	}
 
-	if in.Order == nil || *in.Order != actualState.GetOrder().GetValue() {
+	if in.Order == nil || uint32(*in.Order) != actualState.GetOrder().GetValue() {
 		return false
 	}
 
@@ -492,9 +495,9 @@ func (in *RuleGroupSpec) ExtractCreateRuleGroupRequest() *rulesgroups.CreateRule
 	}
 }
 
-func expandOrder(order *uint32) *wrapperspb.UInt32Value {
+func expandOrder(order *int32) *wrapperspb.UInt32Value {
 	if order != nil {
-		return wrapperspb.UInt32(*order)
+		return wrapperspb.UInt32(uint32(*order))
 	}
 	return nil
 }

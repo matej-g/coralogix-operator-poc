@@ -1,4 +1,4 @@
-package controllers
+package api
 
 func ReverseMap[K, V comparable](m map[K]V) map[V]K {
 	n := make(map[V]K)
