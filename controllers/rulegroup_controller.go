@@ -57,9 +57,9 @@ type RuleGroupReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.13.0/pkg/reconcile
 func (r *RuleGroupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := log.FromContext(ctx)
-	log.Info("!!!")
-	// Get instance
+	_ = log.FromContext(ctx)
+
+	//Get instance
 	instance := &coralogixv1.RuleGroup{}
 	var result ctrl.Result
 	err := r.Client.Get(ctx, req.NamespacedName, instance)
@@ -74,8 +74,20 @@ func (r *RuleGroupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return ctrl.Result{RequeueAfter: defaultErrRequeuePeriod}, err
 	}
 
+	//If ID is nil, create the rule-group
+	if instance.Status.ID == nil {
+		createRuleGroupReq := instance.Spec.ExtractCreateRuleGroupRequest()
+		createRuleGroupResp, err := r.coralogixClientSet.RuleGroups().CreateRuleGroup(ctx, createRuleGroupReq)
+		if err != nil {
+			return ctrl.Result{RequeueAfter: defaultErrRequeuePeriod}, err
+		}
+
+		instance.Status.ID = new(string)
+		*instance.Status.ID = createRuleGroupResp.GetRuleGroup().GetId().GetValue()
+	}
+
 	getRuleGroupReq := &rulesgroups.GetRuleGroupRequest{
-		GroupId: instance.Status.ID,
+		GroupId: *instance.Status.ID,
 	}
 	actualState, err := r.coralogixClientSet.RuleGroups().GetRuleGroup(ctx, getRuleGroupReq)
 	if err != nil {
@@ -83,7 +95,7 @@ func (r *RuleGroupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	if !instance.Spec.DeepEqual(actualState.RuleGroup) {
-		updateRuleGroupReq := instance.Spec.ExtractUpdateRuleGroupRequest(instance.Status.ID)
+		updateRuleGroupReq := instance.Spec.ExtractUpdateRuleGroupRequest(*instance.Status.ID)
 		_, err = r.coralogixClientSet.RuleGroups().UpdateRuleGroup(ctx, updateRuleGroupReq)
 		if err != nil {
 			return ctrl.Result{RequeueAfter: defaultErrRequeuePeriod}, err

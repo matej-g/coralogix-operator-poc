@@ -714,7 +714,7 @@ func flattenRuleMatchers(matchers []*rulesgroups.RuleMatcher) (applications []st
 
 // RuleGroupStatus defines the observed state of RuleGroup
 type RuleGroupStatus struct {
-	ID string `json:"id"`
+	ID *string `json:"id"`
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
