@@ -26,3 +26,11 @@ func SlicesWithUniqueValuesEqual[V comparable](a, b []V) bool {
 
 	return true
 }
+
+func GetKeys[K, V comparable](m map[K]V) []K {
+	result := make([]K, 0)
+	for k := range m {
+		result = append(result, k)
+	}
+	return result
+}

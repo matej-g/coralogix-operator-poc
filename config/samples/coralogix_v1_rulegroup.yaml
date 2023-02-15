@@ -9,4 +9,17 @@ metadata:
     app.kubernetes.io/created-by: coralogix-operator-poc
   name: rulegroup-sample
 spec:
-  # TODO(user): Add fields here
+  name: rule-group
+  description: rule-group from k8s operator
+  applications: ["application-name"]
+  subsystems: ["subsystems-name"]
+  severities: ["Warning"]
+  subgroups:
+    - order: 1
+      rules:
+        - name: rule
+          order: 1
+          parse:
+           sourceField: text
+           destinationField: text
+           regularExpression: .*{

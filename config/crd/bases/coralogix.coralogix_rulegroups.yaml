@@ -42,7 +42,6 @@ spec:
                 items:
                   type: string
                 type: array
-                uniqueItems: true
               creator:
                 type: string
               description:
@@ -57,7 +56,18 @@ spec:
                 format: int32
                 minimum: 1
                 type: integer
-              ruleSubgroups:
+              severities:
+                items:
+                  enum:
+                  - Debug
+                  - Verbose
+                  - Info
+                  - Warning
+                  - Eror
+                  - Critical
+                  type: string
+                type: array
+              subgroups:
                 items:
                   properties:
                     active:
@@ -183,23 +193,10 @@ spec:
                       type: array
                   type: object
                 type: array
-              severities:
-                items:
-                  enum:
-                  - Debug
-                  - Verbose
-                  - Info
-                  - Warning
-                  - Eror
-                  - Critical
-                  type: string
-                type: array
-                uniqueItems: true
               subsystems:
                 items:
                   type: string
                 type: array
-                uniqueItems: true
             required:
             - name
             type: object
