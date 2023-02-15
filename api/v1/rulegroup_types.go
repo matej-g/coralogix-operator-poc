@@ -103,7 +103,10 @@ func (in *Rule) DeepEqual(rule *rulesgroups.Rule) bool {
 	if in.Active != rule.Enabled.GetValue() {
 		return false
 	}
-	if in.Order == nil || uint32(*in.Order) != rule.Order.GetValue() {
+	if in.Order == nil {
+		in.Order = new(int32)
+		*in.Order = int32(rule.Order.GetValue())
+	} else if uint32(*in.Order) != rule.Order.GetValue() {
 		return false
 	}
 	if in.Description != rule.Description.GetValue() {
@@ -362,7 +365,10 @@ func (in *RuleSubGroup) DeepEqual(subgroup *rulesgroups.RuleSubgroup) bool {
 	if in.Active != subgroup.Enabled.GetValue() {
 		return false
 	}
-	if in.Order == nil || uint32(*in.Order) != subgroup.Order.GetValue() {
+	if in.Order == nil {
+		in.Order = new(int32)
+		*in.Order = int32(subgroup.Order.GetValue())
+	} else if uint32(*in.Order) != subgroup.Order.GetValue() {
 		return false
 	}
 	if len(in.Rules) != len(subgroup.Rules) {
@@ -439,7 +445,10 @@ func (in *RuleGroupSpec) DeepEqual(actualState *rulesgroups.RuleGroup) bool {
 		return false
 	}
 
-	if in.Order == nil || uint32(*in.Order) != actualState.GetOrder().GetValue() {
+	if in.Order == nil {
+		in.Order = new(int32)
+		*in.Order = int32(actualState.GetOrder().GetValue())
+	} else if uint32(*in.Order) != actualState.GetOrder().GetValue() {
 		return false
 	}
 

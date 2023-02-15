@@ -18,11 +18,11 @@ package controllers
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"coralogix-operator-poc/controllers/clientset"
 	rulesgroups "coralogix-operator-poc/controllers/clientset/grpc/rules-groups/v1"
+	"github.com/golang/protobuf/jsonpb"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -59,12 +59,16 @@ type RuleGroupReconciler struct {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.13.0/pkg/reconcile
 func (r *RuleGroupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := log.FromContext(ctx)
+	jsm := &jsonpb.Marshaler{
+		//Indent: "\t",
+	}
+	rulesGroupsClient := r.CoralogixClientSet.RuleGroups()
 
 	//Get instance
 	instance := &coralogixv1.RuleGroup{}
 	var result ctrl.Result
-	err := r.Client.Get(ctx, req.NamespacedName, instance)
-	if err != nil {
+
+	if err := r.Client.Get(ctx, req.NamespacedName, instance); err != nil {
 		if errors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
 			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
@@ -75,40 +79,46 @@ func (r *RuleGroupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return ctrl.Result{RequeueAfter: defaultErrRequeuePeriod}, err
 	}
 
-	//If ID is nil, create the rule-group
+	var notFount bool
+	var err error
+	var actualState *rulesgroups.GetRuleGroupResponse
 	if instance.Status.ID == nil {
-		log.Info(fmt.Sprintf("attempt to create rule-group with spec: %v", instance.Spec.ToString()))
-		createRuleGroupReq := instance.Spec.ExtractCreateRuleGroupRequest()
-		createRuleGroupResp, err := r.CoralogixClientSet.RuleGroups().CreateRuleGroup(ctx, createRuleGroupReq)
-		if err != nil {
-			log.Error(err, fmt.Sprintf("received an error while creating a rule-group: %s", err.Error()))
-			return ctrl.Result{RequeueAfter: defaultErrRequeuePeriod}, err
-		}
-		id := createRuleGroupResp.GetRuleGroup().GetId().GetValue()
-		log.Info(fmt.Sprintf("rule-group %s was created:", id))
-		instance.Status.ID = new(string)
-		*instance.Status.ID = id
+		notFount = true
+	} else if actualState, err = rulesGroupsClient.GetRuleGroup(ctx,
+		&rulesgroups.GetRuleGroupRequest{GroupId: *instance.Status.ID}); err != nil && errors.IsNotFound(err) {
+		notFount = true
 	}
 
-	getRuleGroupReq := &rulesgroups.GetRuleGroupRequest{
-		GroupId: *instance.Status.ID,
-	}
-	actualState, err := r.CoralogixClientSet.RuleGroups().GetRuleGroup(ctx, getRuleGroupReq)
-	if err != nil {
-		log.Error(err, fmt.Sprintf("received an error while reading a rule-group: %s", err.Error()))
+	if notFount {
+		createRuleGroupReq := instance.Spec.ExtractCreateRuleGroupRequest()
+		jstr, _ := jsm.MarshalToString(createRuleGroupReq)
+		log.V(1).Info("Creating Rule-Group", "ruleGroup", jstr)
+		if createRuleGroupResp, err := rulesGroupsClient.CreateRuleGroup(ctx, createRuleGroupReq); err == nil {
+			instance.Status.ID = new(string)
+			*instance.Status.ID = createRuleGroupResp.GetRuleGroup().GetId().GetValue()
+			r.Status().Update(ctx, instance)
+			return ctrl.Result{}, nil
+		} else {
+			log.Error(err, "Received an error while creating a Rule-Group", "ruleGroup", createRuleGroupReq)
+			return ctrl.Result{}, err
+		}
+	} else if err != nil {
+		log.Error(err, "Received an error while reading a Rule-Group", "ruleGroup ID", *instance.Status.ID)
 		return ctrl.Result{RequeueAfter: defaultErrRequeuePeriod}, err
 	}
-	log.Info(fmt.Sprintf("received a rule-group: %s", getRuleGroupReq.String()))
 
 	if !instance.Spec.DeepEqual(actualState.RuleGroup) {
-		log.Info(fmt.Sprintf("find diffs betwen spec and actual state. attempt to update rule-group"))
+		jstr, _ := jsm.MarshalToString(actualState)
+		log.V(1).Info("Find diffs between spec and actual state. attempt to update rule-group", "Spec", instance.Spec.ToString(), "Actual state", jstr)
+
 		updateRuleGroupReq := instance.Spec.ExtractUpdateRuleGroupRequest(*instance.Status.ID)
 		updateRuleGroupResp, err := r.CoralogixClientSet.RuleGroups().UpdateRuleGroup(ctx, updateRuleGroupReq)
 		if err != nil {
-			log.Error(err, fmt.Sprintf("received an error while updating a rule-group: %s", err.Error()))
+			log.Error(err, "Received an error while updating a Rule-Group", "ruleGroup", updateRuleGroupReq)
 			return ctrl.Result{RequeueAfter: defaultErrRequeuePeriod}, err
 		}
-		log.Info(fmt.Sprintf("rule-group was updated: %s", updateRuleGroupResp.String()))
+		jstr, _ = jsm.MarshalToString(updateRuleGroupResp)
+		log.V(1).Info("Rule-Group was updated", "ruleGroup", jstr)
 	}
 
 	return ctrl.Result{}, nil
