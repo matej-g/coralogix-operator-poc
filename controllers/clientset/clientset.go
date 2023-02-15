@@ -58,9 +58,8 @@ func (c *ClientSet) Webhooks() *WebhooksClient {
 	return c.webhooks
 }
 
-func NewClientSet(targetUrl, apiKey, teamsApiKey string) *ClientSet {
+func NewClientSet(targetUrl, apiKey string) *ClientSet {
 	apikeyCPC := NewCallPropertiesCreator(targetUrl, apiKey)
-	_ = NewCallPropertiesCreator(targetUrl, teamsApiKey)
 
 	return &ClientSet{
 		ruleGroups:          NewRuleGroupsClient(apikeyCPC),

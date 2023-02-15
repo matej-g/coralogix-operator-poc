@@ -18,8 +18,11 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"os"
 
+	utils "coralogix-operator-poc/api"
+	"coralogix-operator-poc/controllers/clientset"
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
@@ -37,8 +40,16 @@ import (
 )
 
 var (
-	scheme   = runtime.NewScheme()
-	setupLog = ctrl.Log.WithName("setup")
+	scheme          = runtime.NewScheme()
+	setupLog        = ctrl.Log.WithName("setup")
+	regionToGrpcUrl = map[string]string{
+		"APAC1":   "ng-api-grpc.app.coralogix.in:443",
+		"APAC2":   "ng-api-grpc.coralogixsg.com:443",
+		"EUROPE1": "ng-api-grpc.coralogix.com:443",
+		"EUROPE2": "ng-api-grpc.eu2.coralogix.com:443",
+		"USA1":    "ng-api-grpc.coralogix.us:443",
+	}
+	validRegions = utils.GetKeys(regionToGrpcUrl)
 )
 
 func init() {
@@ -57,6 +68,10 @@ func main() {
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
+	region := os.Getenv("CORALOGIX_REGION")
+	flag.StringVar(&region, "region", region, fmt.Sprintf("The region of your Coralogix cluster. Can be one of %q.", validRegions))
+	apiKey := os.Getenv("CORALOGIX_API_KEY")
+	flag.StringVar(&apiKey, "api-key", apiKey, "The proper api-key based on your Coralogix cluster's region")
 	opts := zap.Options{
 		Development: true,
 	}
@@ -89,9 +104,11 @@ func main() {
 		os.Exit(1)
 	}
 
+	targetUrl := regionToGrpcUrl[region]
 	if err = (&controllers.RuleGroupReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		CoralogixClientSet: clientset.NewClientSet(targetUrl, apiKey),
+		Client:             mgr.GetClient(),
+		Scheme:             mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "RuleGroup")
 		os.Exit(1)

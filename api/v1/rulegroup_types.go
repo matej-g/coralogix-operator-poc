@@ -17,6 +17,8 @@ limitations under the License.
 package v1
 
 import (
+	"encoding/json"
+
 	utils "coralogix-operator-poc/api"
 	rulesgroups "coralogix-operator-poc/controllers/clientset/grpc/rules-groups/v1"
 	"google.golang.org/protobuf/types/known/wrapperspb"
@@ -389,15 +391,12 @@ type RuleGroupSpec struct {
 	Active bool `json:"active,omitempty"`
 
 	// +optional
-	//+kubebuilder:validation:UniqueItems=true
 	Applications []string `json:"applications,omitempty"`
 
 	// +optional
-	//+kubebuilder:validation:UniqueItems=true
 	Subsystems []string `json:"subsystems,omitempty"`
 
 	// +optional
-	//+kubebuilder:validation:UniqueItems=true
 	Severities []RuleGroupSeverity `json:"severities,omitempty"`
 
 	//+kubebuilder:default=false
@@ -411,7 +410,12 @@ type RuleGroupSpec struct {
 	Order *int32 `json:"order,omitempty"`
 
 	// +optional
-	RuleSubgroups []RuleSubGroup `json:"ruleSubgroups,omitempty"`
+	RuleSubgroups []RuleSubGroup `json:"subgroups,omitempty"`
+}
+
+func (in *RuleGroupSpec) ToString() string {
+	str, _ := json.Marshal(*in)
+	return string(str)
 }
 
 func (in *RuleGroupSpec) DeepEqual(actualState *rulesgroups.RuleGroup) bool {
@@ -504,8 +508,11 @@ func expandOrder(order *int32) *wrapperspb.UInt32Value {
 
 func expandRuleSubGroups(subGroups []RuleSubGroup) []*rulesgroups.CreateRuleGroupRequest_CreateRuleSubgroup {
 	ruleSubGroups := make([]*rulesgroups.CreateRuleGroupRequest_CreateRuleSubgroup, 0, len(subGroups))
-	for _, subGroup := range subGroups {
+	for i, subGroup := range subGroups {
 		rsg := expandRuleSubGroup(subGroup)
+		if rsg.Order == nil {
+			rsg.Order = wrapperspb.UInt32(uint32(i))
+		}
 		ruleSubGroups = append(ruleSubGroups, rsg)
 	}
 	return ruleSubGroups
