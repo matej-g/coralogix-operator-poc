@@ -13,7 +13,7 @@ spec:
   description: rule-group from k8s operator
   applications: ["application-name"]
   subsystems: ["subsystems-name"]
-  severities: ["Warning"]
+  severities: ["Warning", "Info"]
   subgroups:
     - order: 1
       rules:
@@ -22,4 +22,4 @@ spec:
           parse:
            sourceField: text
            destinationField: text
-           regularExpression: .*{
+           regex: .*{

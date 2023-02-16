@@ -33,7 +33,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: RuleGroupSpec defines the desired state of RuleGroup
+            description: RuleGroupSpec defines the Desired state of RuleGroup
             properties:
               active:
                 default: true
@@ -91,7 +91,7 @@ spec:
                               keepBlockedLogs:
                                 default: false
                                 type: boolean
-                              regularExpression:
+                              regex:
                                 type: string
                               sourceField:
                                 type: string
@@ -100,7 +100,7 @@ spec:
                             type: string
                           extract:
                             properties:
-                              regularExpression:
+                              regex:
                                 type: string
                               sourceField:
                                 type: string
@@ -146,6 +146,7 @@ spec:
                                 type: string
                             type: object
                           name:
+                            minLength: 0
                             type: string
                           order:
                             format: int32
@@ -155,7 +156,7 @@ spec:
                             properties:
                               destinationField:
                                 type: string
-                              regularExpression:
+                              regex:
                                 type: string
                               sourceField:
                                 type: string
@@ -182,7 +183,7 @@ spec:
                             properties:
                               destinationField:
                                 type: string
-                              regularExpression:
+                              regex:
                                 type: string
                               replacementString:
                                 type: string
@@ -197,8 +198,6 @@ spec:
                 items:
                   type: string
                 type: array
-            required:
-            - name
             type: object
           status:
             description: RuleGroupStatus defines the observed state of RuleGroup

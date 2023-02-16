@@ -107,9 +107,8 @@ func (r *RuleGroupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return ctrl.Result{RequeueAfter: defaultErrRequeuePeriod}, err
 	}
 
-	if !instance.Spec.DeepEqual(actualState.RuleGroup) {
-		jstr, _ := jsm.MarshalToString(actualState)
-		log.V(1).Info("Find diffs between spec and actual state. attempt to update rule-group", "Spec", instance.Spec.ToString(), "Actual state", jstr)
+	if equal, diff := instance.Spec.DeepEqual(actualState.RuleGroup); !equal {
+		log.V(1).Info("Find diffs between spec and actual state. attempt to update rule-group", "Diff", diff)
 
 		updateRuleGroupReq := instance.Spec.ExtractUpdateRuleGroupRequest(*instance.Status.ID)
 		updateRuleGroupResp, err := r.CoralogixClientSet.RuleGroups().UpdateRuleGroup(ctx, updateRuleGroupReq)
@@ -117,7 +116,7 @@ func (r *RuleGroupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			log.Error(err, "Received an error while updating a Rule-Group", "ruleGroup", updateRuleGroupReq)
 			return ctrl.Result{RequeueAfter: defaultErrRequeuePeriod}, err
 		}
-		jstr, _ = jsm.MarshalToString(updateRuleGroupResp)
+		jstr, _ := jsm.MarshalToString(updateRuleGroupResp)
 		log.V(1).Info("Rule-Group was updated", "ruleGroup", jstr)
 	}
 

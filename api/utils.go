@@ -1,5 +1,10 @@
 package api
 
+type Diff struct {
+	Name            string
+	Desired, Actual interface{}
+}
+
 func ReverseMap[K, V comparable](m map[K]V) map[V]K {
 	n := make(map[V]K)
 	for k, v := range m {
