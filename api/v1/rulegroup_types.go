@@ -70,10 +70,6 @@ type Rule struct {
 	Active bool `json:"active,omitempty"`
 
 	// +optional
-	// +kubebuilder:validation:Minimum:=1
-	Order *int32 `json:"order,omitempty"`
-
-	// +optional
 	Parse *Parse `json:"parse,omitempty"`
 
 	// +optional
@@ -107,17 +103,6 @@ func (in *Rule) DeepEqual(rule *rulesgroups.Rule) (bool, utils.Diff) {
 			Name:    "Active",
 			Desired: in.Active,
 			Actual:  actualActive,
-		}
-	}
-
-	if in.Order == nil {
-		in.Order = new(int32)
-		*in.Order = int32(rule.Order.GetValue())
-	} else if actualOrder := rule.Order.GetValue(); uint32(*in.Order) != actualOrder {
-		return false, utils.Diff{
-			Name:    "Order",
-			Desired: *in.Order,
-			Actual:  actualOrder,
 		}
 	}
 
@@ -541,10 +526,6 @@ type RuleSubGroup struct {
 	Active bool `json:"active,omitempty"`
 
 	// +optional
-	// +kubebuilder:validation:Minimum:=1
-	Order *int32 `json:"order,omitempty"`
-
-	// +optional
 	Rules []Rule `json:"rules,omitempty"`
 }
 
@@ -557,20 +538,9 @@ func (in *RuleSubGroup) DeepEqual(subgroup *rulesgroups.RuleSubgroup) (bool, uti
 		}
 	}
 
-	if in.Order == nil {
-		in.Order = new(int32)
-		*in.Order = int32(subgroup.Order.GetValue())
-	} else if actualOrder := subgroup.Order.GetValue(); uint32(*in.Order) != actualOrder {
-		return false, utils.Diff{
-			Name:    "Order",
-			Desired: *in.Order,
-			Actual:  actualOrder,
-		}
-	}
-
 	if len(in.Rules) != len(subgroup.Rules) {
 		return false, utils.Diff{
-			Name:    "Rules length",
+			Name:    "Rules.length",
 			Desired: len(in.Rules),
 			Actual:  len(subgroup.Rules),
 		}
@@ -771,9 +741,7 @@ func expandRuleSubGroups(subGroups []RuleSubGroup) []*rulesgroups.CreateRuleGrou
 	ruleSubGroups := make([]*rulesgroups.CreateRuleGroupRequest_CreateRuleSubgroup, 0, len(subGroups))
 	for i, subGroup := range subGroups {
 		rsg := expandRuleSubGroup(subGroup)
-		if rsg.Order == nil {
-			rsg.Order = wrapperspb.UInt32(uint32(i))
-		}
+		rsg.Order = wrapperspb.UInt32(uint32(i + 1))
 		ruleSubGroups = append(ruleSubGroups, rsg)
 	}
 	return ruleSubGroups
@@ -781,19 +749,18 @@ func expandRuleSubGroups(subGroups []RuleSubGroup) []*rulesgroups.CreateRuleGrou
 
 func expandRuleSubGroup(subGroup RuleSubGroup) *rulesgroups.CreateRuleGroupRequest_CreateRuleSubgroup {
 	enabled := wrapperspb.Bool(subGroup.Active)
-	order := expandOrder(subGroup.Order)
 	rules := expandRules(subGroup.Rules)
 	return &rulesgroups.CreateRuleGroupRequest_CreateRuleSubgroup{
 		Enabled: enabled,
-		Order:   order,
 		Rules:   rules,
 	}
 }
 
 func expandRules(rules []Rule) []*rulesgroups.CreateRuleGroupRequest_CreateRuleSubgroup_CreateRule {
 	expandedRules := make([]*rulesgroups.CreateRuleGroupRequest_CreateRuleSubgroup_CreateRule, 0, len(rules))
-	for _, rule := range rules {
+	for i, rule := range rules {
 		r := expandRule(rule)
+		r.Order = wrapperspb.UInt32(uint32(i + 1))
 		expandedRules = append(expandedRules, r)
 	}
 	return expandedRules
@@ -804,7 +771,6 @@ func expandRule(rule Rule) *rulesgroups.CreateRuleGroupRequest_CreateRuleSubgrou
 	description := wrapperspb.String(rule.Description)
 	enabled := wrapperspb.Bool(rule.Active)
 	sourceFiled, paramerters := expandSourceFiledAndParameters(rule)
-	order := expandOrder(rule.Order)
 
 	return &rulesgroups.CreateRuleGroupRequest_CreateRuleSubgroup_CreateRule{
 		Name:        name,
@@ -812,7 +778,6 @@ func expandRule(rule Rule) *rulesgroups.CreateRuleGroupRequest_CreateRuleSubgrou
 		SourceField: sourceFiled,
 		Parameters:  paramerters,
 		Enabled:     enabled,
-		Order:       order,
 	}
 }
 
@@ -850,17 +815,19 @@ func expandSourceFiledAndParameters(rule Rule) (sourceField *wrapperspb.StringVa
 			},
 		}
 	} else if jsonExtract := rule.JsonExtract; jsonExtract != nil {
-		sourceField = wrapperspb.String(jsonExtract.JsonKey)
+		sourceField = wrapperspb.String("text")
 		destinationField := expandJsonExtractDestinationField(jsonExtract.DestinationField)
+		jsonKey := wrapperspb.String(jsonExtract.JsonKey)
 		parameters = &rulesgroups.RuleParameters{
 			RuleParameters: &rulesgroups.RuleParameters_JsonExtractParameters{
 				JsonExtractParameters: &rulesgroups.JsonExtractParameters{
 					DestinationField: destinationField,
-					Rule:             wrapperspb.String(parse.Regex),
+					Rule:             jsonKey,
 				},
 			},
 		}
 	} else if removeFields := rule.RemoveFields; removeFields != nil {
+		sourceField = wrapperspb.String("text")
 		parameters = &rulesgroups.RuleParameters{
 			RuleParameters: &rulesgroups.RuleParameters_RemoveFieldsParameters{
 				RemoveFieldsParameters: &rulesgroups.RemoveFieldsParameters{

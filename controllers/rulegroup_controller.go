@@ -108,7 +108,7 @@ func (r *RuleGroupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	if equal, diff := instance.Spec.DeepEqual(actualState.RuleGroup); !equal {
-		log.V(1).Info("Find diffs between spec and actual state. attempt to update rule-group", "Diff", diff)
+		log.V(1).Info("Find diffs between spec and the actual state", "Diff", diff)
 
 		updateRuleGroupReq := instance.Spec.ExtractUpdateRuleGroupRequest(*instance.Status.ID)
 		updateRuleGroupResp, err := r.CoralogixClientSet.RuleGroups().UpdateRuleGroup(ctx, updateRuleGroupReq)
