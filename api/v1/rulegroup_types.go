@@ -770,13 +770,13 @@ func expandRule(rule Rule) *rulesgroups.CreateRuleGroupRequest_CreateRuleSubgrou
 	name := wrapperspb.String(rule.Name)
 	description := wrapperspb.String(rule.Description)
 	enabled := wrapperspb.Bool(rule.Active)
-	sourceFiled, paramerters := expandSourceFiledAndParameters(rule)
+	sourceFiled, parameters := expandSourceFiledAndParameters(rule)
 
 	return &rulesgroups.CreateRuleGroupRequest_CreateRuleSubgroup_CreateRule{
 		Name:        name,
 		Description: description,
 		SourceField: sourceFiled,
-		Parameters:  paramerters,
+		Parameters:  parameters,
 		Enabled:     enabled,
 	}
 }

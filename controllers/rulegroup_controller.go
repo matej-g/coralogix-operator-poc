@@ -97,10 +97,10 @@ func (r *RuleGroupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			instance.Status.ID = new(string)
 			*instance.Status.ID = createRuleGroupResp.GetRuleGroup().GetId().GetValue()
 			r.Status().Update(ctx, instance)
-			return ctrl.Result{}, nil
+			return ctrl.Result{RequeueAfter: defaultRequeuePeriod}, nil
 		} else {
 			log.Error(err, "Received an error while creating a Rule-Group", "ruleGroup", createRuleGroupReq)
-			return ctrl.Result{}, err
+			return ctrl.Result{RequeueAfter: defaultErrRequeuePeriod}, err
 		}
 	} else if err != nil {
 		log.Error(err, "Received an error while reading a Rule-Group", "ruleGroup ID", *instance.Status.ID)
@@ -120,7 +120,7 @@ func (r *RuleGroupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		log.V(1).Info("Rule-Group was updated", "ruleGroup", jstr)
 	}
 
-	return ctrl.Result{}, nil
+	return ctrl.Result{RequeueAfter: defaultRequeuePeriod}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
