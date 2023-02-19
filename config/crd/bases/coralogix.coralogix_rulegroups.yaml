@@ -63,7 +63,7 @@ spec:
                   - Verbose
                   - Info
                   - Warning
-                  - Eror
+                  - Error
                   - Critical
                   type: string
                 type: array
@@ -73,10 +73,6 @@ spec:
                     active:
                       default: true
                       type: boolean
-                    order:
-                      format: int32
-                      minimum: 1
-                      type: integer
                     rules:
                       items:
                         properties:
@@ -148,10 +144,6 @@ spec:
                           name:
                             minLength: 0
                             type: string
-                          order:
-                            format: int32
-                            minimum: 1
-                            type: integer
                           parse:
                             properties:
                               destinationField:
