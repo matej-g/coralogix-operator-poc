@@ -23,13 +23,16 @@ import (
 	"coralogix-operator-poc/controllers/clientset"
 	rulesgroups "coralogix-operator-poc/controllers/clientset/grpc/rules-groups/v1"
 	"github.com/golang/protobuf/jsonpb"
+	"google.golang.org/grpc/codes"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	coralogixv1 "coralogix-operator-poc/api/v1"
+	"google.golang.org/grpc/status"
 )
 
 const (
@@ -64,53 +67,93 @@ func (r *RuleGroupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 	rulesGroupsClient := r.CoralogixClientSet.RuleGroups()
 
-	//Get instance
-	instance := &coralogixv1.RuleGroup{}
-	var result ctrl.Result
+	//Get ruleGroupCRD
+	ruleGroupCRD := &coralogixv1.RuleGroup{}
 
-	if err := r.Client.Get(ctx, req.NamespacedName, instance); err != nil {
+	if err := r.Client.Get(ctx, req.NamespacedName, ruleGroupCRD); err != nil {
 		if errors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
 			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
 			// Return and don't requeue
-			return result, nil
+			return ctrl.Result{}, nil
 		}
 		// Error reading the object - requeue the request
 		return ctrl.Result{RequeueAfter: defaultErrRequeuePeriod}, err
 	}
 
+	// name of our custom finalizer
+	myFinalizerName := "batch.tutorial.kubebuilder.io/finalizer"
+
+	// examine DeletionTimestamp to determine if object is under deletion
+	if ruleGroupCRD.ObjectMeta.DeletionTimestamp.IsZero() {
+		// The object is not being deleted, so if it does not have our finalizer,
+		// then lets add the finalizer and update the object. This is equivalent
+		// registering our finalizer.
+		if !controllerutil.ContainsFinalizer(ruleGroupCRD, myFinalizerName) {
+			controllerutil.AddFinalizer(ruleGroupCRD, myFinalizerName)
+			if err := r.Update(ctx, ruleGroupCRD); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
+	} else {
+		// The object is being deleted
+		if controllerutil.ContainsFinalizer(ruleGroupCRD, myFinalizerName) {
+			// our finalizer is present, so lets handle any external dependency
+			ruleGroupId := *ruleGroupCRD.Status.ID
+			deleteRuleGroupReq := &rulesgroups.DeleteRuleGroupRequest{GroupId: ruleGroupId}
+			log.V(1).Info("Deleting Rule-Group", "Rule-Group ID", ruleGroupId)
+			if _, err := rulesGroupsClient.DeleteRuleGroup(ctx, deleteRuleGroupReq); err != nil {
+				// if fail to delete the external dependency here, return with error
+				// so that it can be retried
+				log.Error(err, "Received an error while Deleting a Rule-Group", "Rule-Group ID", ruleGroupId)
+				return ctrl.Result{}, err
+			}
+
+			log.V(1).Info("Rule-Group was deleted", "Rule-Group ID", ruleGroupId)
+			// remove our finalizer from the list and update it.
+			controllerutil.RemoveFinalizer(ruleGroupCRD, myFinalizerName)
+			if err := r.Update(ctx, ruleGroupCRD); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
+
+		// Stop reconciliation as the item is being deleted
+		return ctrl.Result{}, nil
+	}
+
 	var notFount bool
 	var err error
 	var actualState *rulesgroups.GetRuleGroupResponse
-	if instance.Status.ID == nil {
+	if ruleGroupCRD.Status.ID == nil {
 		notFount = true
 	} else if actualState, err = rulesGroupsClient.GetRuleGroup(ctx,
-		&rulesgroups.GetRuleGroupRequest{GroupId: *instance.Status.ID}); err != nil && errors.IsNotFound(err) {
+		&rulesgroups.GetRuleGroupRequest{GroupId: *ruleGroupCRD.Status.ID}); status.Code(err) == codes.NotFound {
 		notFount = true
 	}
 
 	if notFount {
-		createRuleGroupReq := instance.Spec.ExtractCreateRuleGroupRequest()
+		createRuleGroupReq := ruleGroupCRD.Spec.ExtractCreateRuleGroupRequest()
 		jstr, _ := jsm.MarshalToString(createRuleGroupReq)
 		log.V(1).Info("Creating Rule-Group", "ruleGroup", jstr)
 		if createRuleGroupResp, err := rulesGroupsClient.CreateRuleGroup(ctx, createRuleGroupReq); err == nil {
-			instance.Status.ID = new(string)
-			*instance.Status.ID = createRuleGroupResp.GetRuleGroup().GetId().GetValue()
-			r.Status().Update(ctx, instance)
+			jstr, _ := jsm.MarshalToString(createRuleGroupResp)
+			log.V(1).Info("Rule-Group was updated", "ruleGroup", jstr)
+			ruleGroupCRD.Status.ID = new(string)
+			*ruleGroupCRD.Status.ID = createRuleGroupResp.GetRuleGroup().GetId().GetValue()
+			r.Status().Update(ctx, ruleGroupCRD)
 			return ctrl.Result{RequeueAfter: defaultRequeuePeriod}, nil
 		} else {
 			log.Error(err, "Received an error while creating a Rule-Group", "ruleGroup", createRuleGroupReq)
 			return ctrl.Result{RequeueAfter: defaultErrRequeuePeriod}, err
 		}
 	} else if err != nil {
-		log.Error(err, "Received an error while reading a Rule-Group", "ruleGroup ID", *instance.Status.ID)
+		log.Error(err, "Received an error while reading a Rule-Group", "ruleGroup ID", *ruleGroupCRD.Status.ID)
 		return ctrl.Result{RequeueAfter: defaultErrRequeuePeriod}, err
 	}
 
-	if equal, diff := instance.Spec.DeepEqual(actualState.RuleGroup); !equal {
+	if equal, diff := ruleGroupCRD.Spec.DeepEqual(actualState.RuleGroup); !equal {
 		log.V(1).Info("Find diffs between spec and the actual state", "Diff", diff)
-
-		updateRuleGroupReq := instance.Spec.ExtractUpdateRuleGroupRequest(*instance.Status.ID)
+		updateRuleGroupReq := ruleGroupCRD.Spec.ExtractUpdateRuleGroupRequest(*ruleGroupCRD.Status.ID)
 		updateRuleGroupResp, err := r.CoralogixClientSet.RuleGroups().UpdateRuleGroup(ctx, updateRuleGroupReq)
 		if err != nil {
 			log.Error(err, "Received an error while updating a Rule-Group", "ruleGroup", updateRuleGroupReq)
