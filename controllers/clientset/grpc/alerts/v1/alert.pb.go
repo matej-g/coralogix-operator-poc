@@ -375,7 +375,7 @@ var file_com_coralogix_alerts_v1_alert_proto_goTypes = []interface{}{
 	(*Date)(nil),                   // 5: com.coralogix.alerts.v1.Date
 	(*AlertCondition)(nil),         // 6: com.coralogix.alerts.v1.AlertCondition
 	(*AlertNotifications)(nil),     // 7: com.coralogix.alerts.v1.AlertNotifications
-	(*AlertFilters)(nil),           // 8: com.coralogix.alerts.v1.AlertFilters
+	(*AlertFilters)(nil),           // 8: com.coralogix.alerts.v1.Filters
 	(*wrapperspb.DoubleValue)(nil), // 9: google.protobuf.DoubleValue
 	(*AlertActiveWhen)(nil),        // 10: com.coralogix.alerts.v1.AlertActiveWhen
 	(*TracingAlert)(nil),           // 11: com.coralogix.alerts.v1.TracingAlert
@@ -391,7 +391,7 @@ var file_com_coralogix_alerts_v1_alert_proto_depIdxs = []int32{
 	5,  // 7: com.coralogix.alerts.v1.Alert.expiration:type_name -> com.coralogix.alerts.v1.Date
 	6,  // 8: com.coralogix.alerts.v1.Alert.condition:type_name -> com.coralogix.alerts.v1.AlertCondition
 	7,  // 9: com.coralogix.alerts.v1.Alert.notifications:type_name -> com.coralogix.alerts.v1.AlertNotifications
-	8,  // 10: com.coralogix.alerts.v1.Alert.filters:type_name -> com.coralogix.alerts.v1.AlertFilters
+	8,  // 10: com.coralogix.alerts.v1.Alert.filters:type_name -> com.coralogix.alerts.v1.Filters
 	9,  // 11: com.coralogix.alerts.v1.Alert.notify_every:type_name -> google.protobuf.DoubleValue
 	10, // 12: com.coralogix.alerts.v1.Alert.active_when:type_name -> com.coralogix.alerts.v1.AlertActiveWhen
 	2,  // 13: com.coralogix.alerts.v1.Alert.notification_payload_filters:type_name -> google.protobuf.StringValue

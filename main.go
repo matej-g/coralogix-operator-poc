@@ -23,6 +23,7 @@ import (
 
 	utils "coralogix-operator-poc/api"
 	"coralogix-operator-poc/controllers/clientset"
+
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
@@ -111,6 +112,13 @@ func main() {
 		Scheme:             mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "RuleGroup")
+		os.Exit(1)
+	}
+	if err = (&controllers.AlertReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "Alert")
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder

@@ -39,3 +39,6 @@ func GetKeys[K, V comparable](m map[K]V) []K {
 	}
 	return result
 }
+
+// +kubebuilder:validation:Enum=Debug;Verbose;Info;Warning;Error;Critical
+type Severity string

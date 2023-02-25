@@ -2053,7 +2053,7 @@ var file_com_coralogix_alerts_v1_alert_service_proto_goTypes = []interface{}{
 	(*Date)(nil),                                  // 31: com.coralogix.alerts.v1.Date
 	(*AlertCondition)(nil),                        // 32: com.coralogix.alerts.v1.AlertCondition
 	(*AlertNotifications)(nil),                    // 33: com.coralogix.alerts.v1.AlertNotifications
-	(*AlertFilters)(nil),                          // 34: com.coralogix.alerts.v1.AlertFilters
+	(*AlertFilters)(nil),                          // 34: com.coralogix.alerts.v1.Filters
 	(*wrapperspb.DoubleValue)(nil),                // 35: google.protobuf.DoubleValue
 	(*AlertActiveWhen)(nil),                       // 36: com.coralogix.alerts.v1.AlertActiveWhen
 	(*MetaLabel)(nil),                             // 37: com.coralogix.alerts.v1.MetaLabel
@@ -2077,7 +2077,7 @@ var file_com_coralogix_alerts_v1_alert_service_proto_depIdxs = []int32{
 	31, // 8: com.coralogix.alerts.v1.CreateAlertRequest.expiration:type_name -> com.coralogix.alerts.v1.Date
 	32, // 9: com.coralogix.alerts.v1.CreateAlertRequest.condition:type_name -> com.coralogix.alerts.v1.AlertCondition
 	33, // 10: com.coralogix.alerts.v1.CreateAlertRequest.notifications:type_name -> com.coralogix.alerts.v1.AlertNotifications
-	34, // 11: com.coralogix.alerts.v1.CreateAlertRequest.filters:type_name -> com.coralogix.alerts.v1.AlertFilters
+	34, // 11: com.coralogix.alerts.v1.CreateAlertRequest.filters:type_name -> com.coralogix.alerts.v1.Filters
 	35, // 12: com.coralogix.alerts.v1.CreateAlertRequest.notify_every:type_name -> google.protobuf.DoubleValue
 	36, // 13: com.coralogix.alerts.v1.CreateAlertRequest.active_when:type_name -> com.coralogix.alerts.v1.AlertActiveWhen
 	27, // 14: com.coralogix.alerts.v1.CreateAlertRequest.notification_payload_filters:type_name -> google.protobuf.StringValue
@@ -2092,7 +2092,7 @@ var file_com_coralogix_alerts_v1_alert_service_proto_depIdxs = []int32{
 	31, // 23: com.coralogix.alerts.v1.GetAlertModelMappingRequest.expiration:type_name -> com.coralogix.alerts.v1.Date
 	32, // 24: com.coralogix.alerts.v1.GetAlertModelMappingRequest.condition:type_name -> com.coralogix.alerts.v1.AlertCondition
 	33, // 25: com.coralogix.alerts.v1.GetAlertModelMappingRequest.notifications:type_name -> com.coralogix.alerts.v1.AlertNotifications
-	34, // 26: com.coralogix.alerts.v1.GetAlertModelMappingRequest.filters:type_name -> com.coralogix.alerts.v1.AlertFilters
+	34, // 26: com.coralogix.alerts.v1.GetAlertModelMappingRequest.filters:type_name -> com.coralogix.alerts.v1.Filters
 	35, // 27: com.coralogix.alerts.v1.GetAlertModelMappingRequest.notify_every:type_name -> google.protobuf.DoubleValue
 	36, // 28: com.coralogix.alerts.v1.GetAlertModelMappingRequest.active_when:type_name -> com.coralogix.alerts.v1.AlertActiveWhen
 	27, // 29: com.coralogix.alerts.v1.GetAlertModelMappingRequest.notification_payload_filters:type_name -> google.protobuf.StringValue
