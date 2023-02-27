@@ -38,29 +38,7 @@ spec:
               active:
                 default: true
                 type: boolean
-              description:
-                type: string
-              expirationDate:
-                properties:
-                  day:
-                    format: int32
-                    maximum: 9999
-                    minimum: 1
-                    type: integer
-                  month:
-                    format: int32
-                    maximum: 12
-                    minimum: 1
-                    type: integer
-                type: object
-              labels:
-                additionalProperties:
-                  type: string
-                type: object
-              name:
-                minLength: 0
-                type: string
-              notification:
+              alertType:
                 properties:
                   flow:
                     properties:
@@ -773,6 +751,61 @@ spec:
                               type: string
                             type: array
                         type: object
+                    type: object
+                type: object
+              description:
+                type: string
+              expirationDate:
+                properties:
+                  day:
+                    format: int32
+                    maximum: 31
+                    minimum: 1
+                    type: integer
+                  month:
+                    format: int32
+                    maximum: 12
+                    minimum: 1
+                    type: integer
+                  year:
+                    format: int32
+                    maximum: 9999
+                    minimum: 1
+                    type: integer
+                type: object
+              labels:
+                additionalProperties:
+                  type: string
+                type: object
+              name:
+                minLength: 0
+                type: string
+              notifications:
+                properties:
+                  ignoreInfinity:
+                    type: boolean
+                  notifyEveryMin:
+                    minimum: 1
+                    type: integer
+                  notifyOnlyOnTriggeredGroupByValues:
+                    type: boolean
+                  onTriggerAndResolved:
+                    type: boolean
+                  payloadFilters:
+                    items:
+                      type: string
+                    type: array
+                  recipients:
+                    properties:
+                      emails:
+                        items:
+                          description: +kubebuilder:validation:Pattern=^[a-z/d._%+\-]+@[a-z/d.\-]+\.[a-z]{2,4}$
+                          type: string
+                        type: array
+                      webhooks:
+                        items:
+                          type: string
+                        type: array
                     type: object
                 type: object
               scheduling:

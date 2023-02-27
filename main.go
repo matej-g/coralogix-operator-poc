@@ -115,8 +115,9 @@ func main() {
 		os.Exit(1)
 	}
 	if err = (&controllers.AlertReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		CoralogixClientSet: clientset.NewClientSet(targetUrl, apiKey),
+		Client:             mgr.GetClient(),
+		Scheme:             mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Alert")
 		os.Exit(1)

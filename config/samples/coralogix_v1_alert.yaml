@@ -33,7 +33,7 @@ spec:
         severities: [ "Warning", "Info" ]
       conditions:
         alertWhen: Less
-        threshold: 5.5
+        threshold: "5.5"
         timeWindow: FiveMinutes
         groupBy: [ "coralogix.metadata.sdkId" ]
         manageUndetectedValues:

@@ -104,7 +104,7 @@ type AlertSpec struct {
 	ExpirationDate *ExpirationDate `json:"expirationDate,omitempty"`
 
 	// +optional
-	Notifications *Notifications `json:"notification,omitempty"`
+	Notifications *Notifications `json:"notifications,omitempty"`
 
 	Scheduling *Scheduling `json:"scheduling,omitempty"`
 
@@ -289,6 +289,7 @@ func expandStandardCondition(condition StandardConditions, notifyWhenResolved, n
 			parameters.NotifyGroupByOnlyAlerts = wrapperspb.Bool(*notifyOnlyOnTriggeredGroupByValues)
 		}
 		if manageUndetectedValues := condition.ManageUndetectedValues; manageUndetectedValues != nil {
+			parameters.RelatedExtendedData = new(alerts.RelatedExtendedData)
 			parameters.RelatedExtendedData.ShouldTriggerDeadman = wrapperspb.Bool(manageUndetectedValues.EnableTriggeringOnUndetectedValues)
 			cleanupDeadmanDuration := alertSchemaDeadmanDurationToProtoDeadmanDuration[*manageUndetectedValues.AutoRetireRatio]
 			parameters.RelatedExtendedData.CleanupDeadmanDuration = &cleanupDeadmanDuration
@@ -480,7 +481,7 @@ type Notifications struct {
 
 	// +optional
 	// +kubebuilder:validation:Minimum:=1
-	NotifyEveryMin *int `json:"NotifyEveryMin,omitempty"`
+	NotifyEveryMin *int `json:"notifyEveryMin,omitempty"`
 
 	// +optional
 	PayloadFilters []string `json:"payloadFilters,omitempty"`
