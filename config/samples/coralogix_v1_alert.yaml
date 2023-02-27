@@ -9,4 +9,33 @@ metadata:
     app.kubernetes.io/created-by: coralogix-operator-poc
   name: alert-sample
 spec:
-  # TODO(user): Add fields here
+  name: alert
+  description: alert from k8s operator
+  severity: Info
+  labels:
+    alert_type: security
+    security_severity: high
+  notifications:
+    recipients:
+      emails: [ "user@example.com" ]
+      webhooks: [ "WebhookAlerts" ]
+    notifyEveryMin: 1
+  scheduling:
+    daysEnabled: [ "Wednesday", "Thursday" ]
+    startTime: 08:00
+    endTime: 20:00
+  alertType:
+    standard:
+      filters:
+        searchQuery: remote_addr_enriched:/.*/
+        applications: [ "filter:contains:nginx" ]
+        subsystems: [ "filter:startsWith:subsystem-name" ]
+        severities: [ "Warning", "Info" ]
+      conditions:
+        alertWhen: Less
+        threshold: 5.5
+        timeWindow: FiveMinutes
+        groupBy: [ "coralogix.metadata.sdkId" ]
+        manageUndetectedValues:
+          enableTriggeringOnUndetectedValues: true
+          autoRetireRatio: FiveMinutes

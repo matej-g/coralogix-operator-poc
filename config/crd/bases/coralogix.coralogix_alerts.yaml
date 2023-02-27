@@ -43,10 +43,12 @@ spec:
               expirationDate:
                 properties:
                   day:
+                    format: int32
                     maximum: 9999
                     minimum: 1
                     type: integer
                   month:
+                    format: int32
                     maximum: 12
                     minimum: 1
                     type: integer
@@ -162,7 +164,7 @@ spec:
                                 - TwoHours
                                 - FourHours
                                 - SixHours
-                                - TwelveeHours
+                                - TwelveHours
                                 - TwentyFourHours
                                 type: string
                             type: object
@@ -226,7 +228,7 @@ spec:
                                 - TwoHours
                                 - FourHours
                                 - SixHours
-                                - TwelveeHours
+                                - TwelveHours
                                 - TwentyFourHours
                                 type: string
                             type: object
@@ -287,8 +289,8 @@ spec:
                               - Verbose
                               - Info
                               - Warning
-                              - Error
                               - Critical
+                              - Error
                               type: string
                             type: array
                           subsystems:
@@ -333,7 +335,7 @@ spec:
                             - TwoHours
                             - FourHours
                             - SixHours
-                            - TwelveeHours
+                            - TwelveHours
                             - TwentyFourHours
                             - ThirtySixHours
                             type: string
@@ -373,8 +375,8 @@ spec:
                               - Verbose
                               - Info
                               - Warning
-                              - Error
                               - Critical
+                              - Error
                               type: string
                             type: array
                           subsystems:
@@ -417,8 +419,8 @@ spec:
                               - Verbose
                               - Info
                               - Warning
-                              - Error
                               - Critical
+                              - Error
                               type: string
                             type: array
                           subsystems:
@@ -475,7 +477,7 @@ spec:
                             - TwoHours
                             - FourHours
                             - SixHours
-                            - TwelveeHours
+                            - TwelveHours
                             - TwentyFourHours
                             - ThirtySixHours
                             type: string
@@ -515,8 +517,8 @@ spec:
                               - Verbose
                               - Info
                               - Warning
-                              - Error
                               - Critical
+                              - Error
                               type: string
                             type: array
                           subsystems:
@@ -605,8 +607,8 @@ spec:
                               - Verbose
                               - Info
                               - Warning
-                              - Error
                               - Critical
+                              - Error
                               type: string
                             type: array
                           subsystems:
@@ -645,7 +647,7 @@ spec:
                             - TwoHours
                             - FourHours
                             - SixHours
-                            - TwelveeHours
+                            - TwelveHours
                             - TwentyFourHours
                             - ThirtySixHours
                             type: string
@@ -722,7 +724,7 @@ spec:
                             - TwoHours
                             - FourHours
                             - SixHours
-                            - TwelveeHours
+                            - TwelveHours
                             - TwentyFourHours
                             - ThirtySixHours
                             type: string
@@ -762,8 +764,8 @@ spec:
                               - Verbose
                               - Info
                               - Warning
-                              - Error
                               - Critical
+                              - Error
                               type: string
                             type: array
                           subsystems:
@@ -777,7 +779,14 @@ spec:
                 properties:
                   daysEnabled:
                     items:
-                      description: +kubebuilder:validation:Enum=Sunday;Monday;Tuesday;Wednesday;Thursday;Friday;Saturday;
+                      enum:
+                      - Sunday
+                      - Monday
+                      - Tuesday
+                      - Wednesday
+                      - Thursday
+                      - Friday
+                      - Saturday
                       type: string
                     type: array
                   endTime:
@@ -793,12 +802,10 @@ spec:
                 type: object
               severity:
                 enum:
-                - Debug
-                - Verbose
                 - Info
                 - Warning
-                - Error
                 - Critical
+                - Error
                 type: string
             type: object
           status:

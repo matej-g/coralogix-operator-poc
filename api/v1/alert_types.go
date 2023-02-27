@@ -108,7 +108,7 @@ type AlertSpec struct {
 
 	Scheduling *Scheduling `json:"scheduling,omitempty"`
 
-	AlertType AlertType `json:"notification,omitempty"`
+	AlertType AlertType `json:"alertType,omitempty"`
 }
 
 func (in *AlertSpec) ExtractCreateAlertRequest() *alerts.CreateAlertRequest {
@@ -462,7 +462,7 @@ type ExpirationDate struct {
 
 	// +kubebuilder:validation:Minimum:=1
 	// +kubebuilder:validation:Maximum:=9999
-	Year int32 `json:"day,omitempty"`
+	Year int32 `json:"year,omitempty"`
 }
 
 type Notifications struct {
