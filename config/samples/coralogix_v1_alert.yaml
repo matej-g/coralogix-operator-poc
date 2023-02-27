@@ -19,7 +19,7 @@ spec:
     recipients:
       emails: [ "user@example.com" ]
       webhooks: [ "WebhookAlerts" ]
-    notifyEveryMin: 1
+    notifyEveryMin: 10
   scheduling:
     daysEnabled: [ "Wednesday", "Thursday" ]
     startTime: 08:00
@@ -33,7 +33,7 @@ spec:
         severities: [ "Warning", "Info" ]
       conditions:
         alertWhen: Less
-        threshold: "5.5"
+        threshold: 5
         timeWindow: FiveMinutes
         groupBy: [ "coralogix.metadata.sdkId" ]
         manageUndetectedValues:

@@ -254,7 +254,7 @@ func expandMetadata(filters *Filters) *alerts.AlertFilters_MetadataFilters {
 func expandStandardCondition(condition StandardConditions, notifyWhenResolved, notifyOnlyOnTriggeredGroupByValues *bool) *alerts.AlertCondition {
 	switch condition.AlertWhen {
 	case "More":
-		threshold := wrapperspb.Double(condition.Threshold.AsApproximateFloat64())
+		threshold := wrapperspb.Double(float64(*condition.Threshold))
 		timeFrame := alertSchemaTimeWindowToProtoTimeWindow[string(*condition.TimeWindow)]
 		groupBy := utils.StringSliceToWrappedStringSlice(condition.GroupBy)
 		parameters := &alerts.ConditionParameters{
@@ -274,7 +274,7 @@ func expandStandardCondition(condition StandardConditions, notifyWhenResolved, n
 			},
 		}
 	case "Less":
-		threshold := wrapperspb.Double(condition.Threshold.AsApproximateFloat64())
+		threshold := wrapperspb.Double(float64(*condition.Threshold))
 		timeFrame := alertSchemaTimeWindowToProtoTimeWindow[string(*condition.TimeWindow)]
 		groupBy := utils.StringSliceToWrappedStringSlice(condition.GroupBy)
 		parameters := &alerts.ConditionParameters{
@@ -295,8 +295,8 @@ func expandStandardCondition(condition StandardConditions, notifyWhenResolved, n
 			parameters.RelatedExtendedData.CleanupDeadmanDuration = &cleanupDeadmanDuration
 		}
 		return &alerts.AlertCondition{
-			Condition: &alerts.AlertCondition_MoreThan{
-				MoreThan: &alerts.MoreThanCondition{Parameters: parameters},
+			Condition: &alerts.AlertCondition_LessThan{
+				LessThan: &alerts.LessThanCondition{Parameters: parameters},
 			},
 		}
 	case "Immediately":
@@ -304,7 +304,7 @@ func expandStandardCondition(condition StandardConditions, notifyWhenResolved, n
 			Condition: &alerts.AlertCondition_Immediate{},
 		}
 	case "MoreThanUsual":
-		threshold := wrapperspb.Double(condition.Threshold.AsApproximateFloat64())
+		threshold := wrapperspb.Double(float64(*condition.Threshold))
 		groupBy := utils.StringSliceToWrappedStringSlice(condition.GroupBy)
 		parameters := &alerts.ConditionParameters{
 			Threshold: threshold,
@@ -617,7 +617,7 @@ type StandardConditions struct {
 	AlertWhen StandardAlertWhen `json:"alertWhen,omitempty"`
 
 	// +optional
-	Threshold *resource.Quantity `json:"threshold,omitempty"`
+	Threshold *int `json:"threshold,omitempty"`
 
 	// +optional
 	TimeWindow *TimeWindow `json:"timeWindow,omitempty"`

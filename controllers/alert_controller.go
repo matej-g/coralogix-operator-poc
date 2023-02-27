@@ -96,6 +96,12 @@ func (r *AlertReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		// The object is being deleted
 		if controllerutil.ContainsFinalizer(alertCRD, myFinalizerName) {
 			// our finalizer is present, so lets handle any external dependency
+			if alertCRD.Status.ID == nil {
+				controllerutil.RemoveFinalizer(alertCRD, myFinalizerName)
+				err := r.Update(ctx, alertCRD)
+				return ctrl.Result{}, err
+			}
+
 			alertId := *alertCRD.Status.ID
 			deleteAlertReq := &alerts.DeleteAlertByUniqueIdRequest{Id: wrapperspb.String(alertId)}
 			log.V(1).Info("Deleting Alert", "Alert ID", alertId)

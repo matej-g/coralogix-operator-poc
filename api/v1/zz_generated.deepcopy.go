@@ -1071,8 +1071,8 @@ func (in *StandardConditions) DeepCopyInto(out *StandardConditions) {
 	*out = *in
 	if in.Threshold != nil {
 		in, out := &in.Threshold, &out.Threshold
-		x := (*in).DeepCopy()
-		*out = &x
+		*out = new(int)
+		**out = **in
 	}
 	if in.TimeWindow != nil {
 		in, out := &in.TimeWindow, &out.TimeWindow
