@@ -27,21 +27,21 @@ import (
 )
 
 var (
-	rulesSchemaSeverityToProtoSeverity = map[utils.Severity]string{
-		"Debug":    "VALUE_DEBUG_OR_UNSPECIFIED",
-		"Verbose":  "VALUE_VERBOSE",
-		"Info":     "VALUE_INFO",
-		"Warning":  "VALUE_WARNING",
-		"Error":    "VALUE_ERROR",
-		"Critical": "VALUE_CRITICAL",
+	rulesSchemaSeverityToProtoSeverity = map[RuleSeverity]rulesgroups.SeverityConstraint_Value{
+		"Debug":    rulesgroups.SeverityConstraint_VALUE_DEBUG_OR_UNSPECIFIED,
+		"Verbose":  rulesgroups.SeverityConstraint_VALUE_VERBOSE,
+		"Info":     rulesgroups.SeverityConstraint_VALUE_INFO,
+		"Warning":  rulesgroups.SeverityConstraint_VALUE_WARNING,
+		"Error":    rulesgroups.SeverityConstraint_VALUE_ERROR,
+		"Critical": rulesgroups.SeverityConstraint_VALUE_CRITICAL,
 	}
 	rulesProtoSeverityToSchemaSeverity                         = utils.ReverseMap(rulesSchemaSeverityToProtoSeverity)
 	rulesSchemaDestinationFieldToProtoSeverityDestinationField = map[DestinationField]string{
-		"Category":  "DESTINATION_FIELD_CATEGORY_OR_UNSPECIFIED",
-		"ClassName": "DESTINATION_FIELD_CLASSNAME",
-		"Method":    "DESTINATION_FIELD_METHODNAME",
-		"ThreadID":  "DESTINATION_FIELD_THREADID",
-		"Severity":  "DESTINATION_FIELD_SEVERITY",
+		"Category":     "DESTINATION_FIELD_CATEGORY_OR_UNSPECIFIED",
+		"ClassName":    "DESTINATION_FIELD_CLASSNAME",
+		"Method":       "DESTINATION_FIELD_METHODNAME",
+		"ThreadID":     "DESTINATION_FIELD_THREADID",
+		"RuleSeverity": "DESTINATION_FIELD_SEVERITY",
 	}
 	rulesProtoSeverityDestinationFieldToSchemaDestinationField = utils.ReverseMap(rulesSchemaDestinationFieldToProtoSeverityDestinationField)
 	rulesSchemaFormatStandardToProtoFormatStandard             = map[FieldFormatStandard]string{
@@ -577,7 +577,7 @@ type RuleGroupSpec struct {
 	Subsystems []string `json:"subsystems,omitempty"`
 
 	// +optional
-	Severities []utils.Severity `json:"severities,omitempty"`
+	Severities []RuleSeverity `json:"severities,omitempty"`
 
 	//+kubebuilder:default=false
 	Hidden bool `json:"hidden,omitempty"`
@@ -592,6 +592,9 @@ type RuleGroupSpec struct {
 	// +optional
 	RuleSubgroups []RuleSubGroup `json:"subgroups,omitempty"`
 }
+
+// +kubebuilder:validation:Enum=Debug;Verbose;Info;Warning;Error;Critical
+type RuleSeverity string
 
 func (in *RuleGroupSpec) ToString() string {
 	str, _ := json.Marshal(*in)
@@ -893,7 +896,7 @@ func expandJsonExtractDestinationField(destinationField DestinationField) rulesg
 	)
 }
 
-func expandRuleMatchers(applications, subsystems []string, severities []utils.Severity) []*rulesgroups.RuleMatcher {
+func expandRuleMatchers(applications, subsystems []string, severities []RuleSeverity) []*rulesgroups.RuleMatcher {
 	ruleMatchers := make([]*rulesgroups.RuleMatcher, 0, len(applications)+len(subsystems)+len(severities))
 
 	for _, app := range applications {
@@ -911,7 +914,7 @@ func expandRuleMatchers(applications, subsystems []string, severities []utils.Se
 	}
 
 	for _, sev := range severities {
-		constraintEnum := expandRuledSeverity(sev)
+		constraintEnum := rulesSchemaSeverityToProtoSeverity[sev]
 		severityConstraint := rulesgroups.SeverityConstraint{Value: constraintEnum}
 		ruleMatcherSeverity := rulesgroups.RuleMatcher_Severity{Severity: &severityConstraint}
 		ruleMatchers = append(ruleMatchers, &rulesgroups.RuleMatcher{Constraint: &ruleMatcherSeverity})
@@ -920,15 +923,10 @@ func expandRuleMatchers(applications, subsystems []string, severities []utils.Se
 	return ruleMatchers
 }
 
-func expandRuledSeverity(severity utils.Severity) rulesgroups.SeverityConstraint_Value {
-	sevStr := rulesSchemaSeverityToProtoSeverity[severity]
-	return rulesgroups.SeverityConstraint_Value(rulesgroups.SeverityConstraint_Value_value[sevStr])
-}
-
-func flattenRuleMatchers(matchers []*rulesgroups.RuleMatcher) (applications []string, subsystems []string, severities []utils.Severity) {
+func flattenRuleMatchers(matchers []*rulesgroups.RuleMatcher) (applications []string, subsystems []string, severities []RuleSeverity) {
 	applications = make([]string, 0)
 	subsystems = make([]string, 0)
-	severities = make([]utils.Severity, 0)
+	severities = make([]RuleSeverity, 0)
 
 	for _, m := range matchers {
 		switch m.Constraint.(type) {
@@ -937,7 +935,7 @@ func flattenRuleMatchers(matchers []*rulesgroups.RuleMatcher) (applications []st
 		case *rulesgroups.RuleMatcher_SubsystemName:
 			subsystems = append(subsystems, m.GetSubsystemName().GetValue().GetValue())
 		case *rulesgroups.RuleMatcher_Severity:
-			severities = append(severities, rulesProtoSeverityToSchemaSeverity[m.GetSeverity().GetValue().String()])
+			severities = append(severities, rulesProtoSeverityToSchemaSeverity[m.GetSeverity().GetValue()])
 		}
 	}
 

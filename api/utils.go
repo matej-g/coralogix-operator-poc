@@ -1,5 +1,7 @@
 package api
 
+import "google.golang.org/protobuf/types/known/wrapperspb"
+
 type Diff struct {
 	Name            string
 	Desired, Actual interface{}
@@ -40,5 +42,10 @@ func GetKeys[K, V comparable](m map[K]V) []K {
 	return result
 }
 
-// +kubebuilder:validation:Enum=Debug;Verbose;Info;Warning;Error;Critical
-type Severity string
+func StringSliceToWrappedStringSlice(arr []string) []*wrapperspb.StringValue {
+	result := make([]*wrapperspb.StringValue, 0, len(arr))
+	for _, s := range arr {
+		result = append(result, wrapperspb.String(s))
+	}
+	return result
+}

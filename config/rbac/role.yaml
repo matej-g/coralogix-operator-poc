@@ -8,6 +8,32 @@ rules:
 - apiGroups:
   - coralogix.coralogix
   resources:
+  - alerts
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - coralogix.coralogix
+  resources:
+  - alerts/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - coralogix.coralogix
+  resources:
+  - alerts/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - coralogix.coralogix
+  resources:
   - rulegroups
   verbs:
   - create

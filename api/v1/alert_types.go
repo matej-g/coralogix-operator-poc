@@ -17,12 +17,69 @@ limitations under the License.
 package v1
 
 import (
+	"strconv"
+	"strings"
+
 	utils "coralogix-operator-poc/api"
+	alerts "coralogix-operator-poc/controllers/clientset/grpc/alerts/v1"
+	"google.golang.org/protobuf/types/known/wrapperspb"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
+
+var (
+	alertSchemaSeverityToProtoSeverity = map[AlertSeverity]alerts.AlertSeverity{
+		"Info":     alerts.AlertSeverity_ALERT_SEVERITY_INFO_OR_UNSPECIFIED,
+		"Warning":  alerts.AlertSeverity_ALERT_SEVERITY_WARNING,
+		"Critical": alerts.AlertSeverity_ALERT_SEVERITY_CRITICAL,
+		"Error":    alerts.AlertSeverity_ALERT_SEVERITY_ERROR,
+	}
+	alertSchemaDayToProtoDay = map[Day]alerts.DayOfWeek{
+		"Sunday":    alerts.DayOfWeek_DAY_OF_WEEK_SUNDAY,
+		"Monday":    alerts.DayOfWeek_DAY_OF_WEEK_MONDAY_OR_UNSPECIFIED,
+		"Tuesday":   alerts.DayOfWeek_DAY_OF_WEEK_TUESDAY,
+		"Wednesday": alerts.DayOfWeek_DAY_OF_WEEK_WEDNESDAY,
+		"Thursday":  alerts.DayOfWeek_DAY_OF_WEEK_THURSDAY,
+		"Friday":    alerts.DayOfWeek_DAY_OF_WEEK_FRIDAY,
+		"Saturday":  alerts.DayOfWeek_DAY_OF_WEEK_SATURDAY,
+	}
+	alertSchemaTimeWindowToProtoTimeWindow = map[string]alerts.Timeframe{
+		"Minute":          alerts.Timeframe_TIMEFRAME_1_MIN,
+		"FiveMinutes":     alerts.Timeframe_TIMEFRAME_5_MIN_OR_UNSPECIFIED,
+		"TenMinutes":      alerts.Timeframe_TIMEFRAME_10_MIN,
+		"FifteenMinutes":  alerts.Timeframe_TIMEFRAME_15_MIN,
+		"TwentyMinutes":   alerts.Timeframe_TIMEFRAME_20_MIN,
+		"ThirtyMinutes":   alerts.Timeframe_TIMEFRAME_30_MIN,
+		"Hour":            alerts.Timeframe_TIMEFRAME_1_H,
+		"TwoHours":        alerts.Timeframe_TIMEFRAME_2_H,
+		"FourHours":       alerts.Timeframe_TIMEFRAME_4_H,
+		"SixHours":        alerts.Timeframe_TIMEFRAME_6_H,
+		"TwelveHours":     alerts.Timeframe_TIMEFRAME_12_H,
+		"TwentyFourHours": alerts.Timeframe_TIMEFRAME_24_H,
+		"ThirtySixHours":  alerts.Timeframe_TIMEFRAME_36_H,
+	}
+	alertSchemaDeadmanDurationToProtoDeadmanDuration = map[AutoRetireRatio]alerts.CleanupDeadmanDuration{
+		"Never":           alerts.CleanupDeadmanDuration_CLEANUP_DEADMAN_DURATION_NEVER_OR_UNSPECIFIED,
+		"FiveMinutes":     alerts.CleanupDeadmanDuration_CLEANUP_DEADMAN_DURATION_5MIN,
+		"TenMinutes":      alerts.CleanupDeadmanDuration_CLEANUP_DEADMAN_DURATION_10MIN,
+		"Hour":            alerts.CleanupDeadmanDuration_CLEANUP_DEADMAN_DURATION_1H,
+		"TwoHours":        alerts.CleanupDeadmanDuration_CLEANUP_DEADMAN_DURATION_2H,
+		"SixHours":        alerts.CleanupDeadmanDuration_CLEANUP_DEADMAN_DURATION_6H,
+		"TwelveHours":     alerts.CleanupDeadmanDuration_CLEANUP_DEADMAN_DURATION_12H,
+		"TwentyFourHours": alerts.CleanupDeadmanDuration_CLEANUP_DEADMAN_DURATION_24H,
+	}
+	alertSchemaFiltersLogSeverityToProtoFiltersLogSeverity = map[FiltersLogSeverity]alerts.AlertFilters_LogSeverity{
+		"Debug":    alerts.AlertFilters_LOG_SEVERITY_DEBUG_OR_UNSPECIFIED,
+		"Verbose":  alerts.AlertFilters_LOG_SEVERITY_VERBOSE,
+		"Info":     alerts.AlertFilters_LOG_SEVERITY_INFO,
+		"Warning":  alerts.AlertFilters_LOG_SEVERITY_WARNING,
+		"Critical": alerts.AlertFilters_LOG_SEVERITY_CRITICAL,
+		"Error":    alerts.AlertFilters_LOG_SEVERITY_ERROR,
+	}
+)
 
 // AlertSpec defines the desired state of Alert
 type AlertSpec struct {
@@ -38,37 +95,377 @@ type AlertSpec struct {
 	//+kubebuilder:default=true
 	Active bool `json:"active,omitempty"`
 
-	Severity utils.Severity `json:"severity,omitempty"`
+	Severity AlertSeverity `json:"severity,omitempty"`
 
 	// +optional
 	Labels map[string]string `json:"labels,omitempty"`
 
 	// +optional
-	ExpirationDate ExpirationDate `json:"expirationDate,omitempty"`
+	ExpirationDate *ExpirationDate `json:"expirationDate,omitempty"`
 
 	// +optional
-	Notification Notification `json:"notification,omitempty"`
+	Notifications *Notifications `json:"notification,omitempty"`
 
-	Scheduling Scheduling `json:"scheduling,omitempty"`
+	Scheduling *Scheduling `json:"scheduling,omitempty"`
 
 	AlertType AlertType `json:"notification,omitempty"`
 }
 
+func (in *AlertSpec) ExtractCreateAlertRequest() *alerts.CreateAlertRequest {
+	enabled := wrapperspb.Bool(in.Active)
+	name := wrapperspb.String(in.Name)
+	description := wrapperspb.String(in.Description)
+	severity := alertSchemaSeverityToProtoSeverity[in.Severity]
+	metaLabels := expandMetaLabels(in.Labels)
+	expirationDate := expandExpirationDate(in.ExpirationDate)
+	notifications := expandNotifications(in.Notifications.Recipients)
+	notifyEvery := expandNotifyEvery(in.Notifications.NotifyEveryMin)
+	payloadFilters := utils.StringSliceToWrappedStringSlice(in.Notifications.PayloadFilters)
+	activeWhen := expandActiveWhen(in.Scheduling)
+	alertTypeParams := expandAlertType(in.AlertType, in.Notifications.OnTriggerAndResolved,
+		in.Notifications.NotifyOnlyOnTriggeredGroupByValues, in.Notifications.IgnoreInfinity)
+
+	return &alerts.CreateAlertRequest{
+		Name:                       name,
+		Description:                description,
+		IsActive:                   enabled,
+		Severity:                   severity,
+		MetaLabels:                 metaLabels,
+		Expiration:                 expirationDate,
+		Notifications:              notifications,
+		NotifyEvery:                notifyEvery,
+		NotificationPayloadFilters: payloadFilters,
+		ActiveWhen:                 activeWhen,
+		Filters:                    alertTypeParams.filters,
+		Condition:                  alertTypeParams.condition,
+		TracingAlert:               alertTypeParams.tracingAlert,
+	}
+}
+
+type alertTypeParams struct {
+	filters      *alerts.AlertFilters
+	condition    *alerts.AlertCondition
+	tracingAlert *alerts.TracingAlert
+}
+
+func expandAlertType(alertType AlertType, onTriggerAndResolved, notifyOnlyOnTriggeredGroupByValues, ignoreInfinity *bool) alertTypeParams {
+	if standard := alertType.Standard; standard != nil {
+		return expandStandard(standard, onTriggerAndResolved, notifyOnlyOnTriggeredGroupByValues)
+	} else if ratio := alertType.Ratio; ratio != nil {
+		return expandRatio(ratio, onTriggerAndResolved, notifyOnlyOnTriggeredGroupByValues, ignoreInfinity)
+	} else if newValue := alertType.NewValue; newValue != nil {
+		return expandNewValue(newValue)
+	} else if uniqueCount := alertType.UniqueCount; uniqueCount != nil {
+		return expandUniqueCount(uniqueCount)
+	} else if timeRelative := alertType.TimeRelative; newValue != nil {
+		return expandTimeRelative(timeRelative, onTriggerAndResolved, notifyOnlyOnTriggeredGroupByValues, ignoreInfinity)
+	} else if metric := alertType.Metric; metric != nil {
+		return expandMetric(metric, onTriggerAndResolved, notifyOnlyOnTriggeredGroupByValues)
+	} else if tracing := alertType.Tracing; tracing != nil {
+		return expandTracing(tracing, onTriggerAndResolved)
+	} else if flow := alertType.Flow; flow != nil {
+		return expandFlow(flow)
+	}
+
+	return alertTypeParams{}
+}
+
+func expandStandard(standard *Standard, notifyWhenResolved, notifyOnlyOnTriggeredGroupByValues *bool) alertTypeParams {
+	condition := expandStandardCondition(standard.Conditions, notifyWhenResolved, notifyOnlyOnTriggeredGroupByValues)
+	filters := expandStandardFilters(standard.Filters)
+	return alertTypeParams{
+		condition: condition,
+		filters:   filters,
+	}
+}
+
+func expandRatio(ratio *Ratio, notifyWhenResolved, notifyOnlyOnTriggeredGroupByValues, ignoreInfinity *bool) alertTypeParams {
+	return alertTypeParams{}
+}
+
+func expandNewValue(newValue *NewValue) alertTypeParams {
+	return alertTypeParams{}
+}
+
+func expandUniqueCount(count *UniqueCount) alertTypeParams {
+	return alertTypeParams{}
+}
+
+func expandTimeRelative(timeRelative *TimeRelative, notifyWhenResolved, notifyOnlyOnTriggeredGroupByValues, ignoreInfinity *bool) alertTypeParams {
+	return alertTypeParams{}
+}
+
+func expandMetric(metric *Metric, notifyWhenResolved, notifyOnlyOnTriggeredGroupByValues *bool) alertTypeParams {
+	return alertTypeParams{}
+}
+
+func expandTracing(tracing *Tracing, notifyWhenResolved *bool) alertTypeParams {
+	return alertTypeParams{}
+}
+
+func expandFlow(flow *Flow) alertTypeParams {
+	return alertTypeParams{}
+}
+
+func expandStandardFilters(filters *Filters) *alerts.AlertFilters {
+	severities := expandAlertFiltersSeverities(filters.Severities)
+	metadata := expandMetadata(filters)
+
+	filter := &alerts.AlertFilters{
+		Severities: severities,
+		Metadata:   metadata,
+	}
+
+	if searchQuery := filters.SearchQuery; searchQuery != nil {
+		filter.Text = wrapperspb.String(*searchQuery)
+	}
+
+	return filter
+}
+
+func expandAlertFiltersSeverities(severities []FiltersLogSeverity) []alerts.AlertFilters_LogSeverity {
+	result := make([]alerts.AlertFilters_LogSeverity, 0, len(severities))
+	for _, s := range severities {
+		severity := alertSchemaFiltersLogSeverityToProtoFiltersLogSeverity[s]
+		result = append(result, severity)
+	}
+	return result
+}
+
+func expandMetadata(filters *Filters) *alerts.AlertFilters_MetadataFilters {
+	categories := utils.StringSliceToWrappedStringSlice(filters.Categories)
+	applications := utils.StringSliceToWrappedStringSlice(filters.Applications)
+	subsystems := utils.StringSliceToWrappedStringSlice(filters.Subsystems)
+	ips := utils.StringSliceToWrappedStringSlice(filters.IPs)
+	classes := utils.StringSliceToWrappedStringSlice(filters.Classes)
+	methods := utils.StringSliceToWrappedStringSlice(filters.Methods)
+	computers := utils.StringSliceToWrappedStringSlice(filters.Computers)
+	return &alerts.AlertFilters_MetadataFilters{
+		Categories:   categories,
+		Applications: applications,
+		Subsystems:   subsystems,
+		IpAddresses:  ips,
+		Classes:      classes,
+		Methods:      methods,
+		Computers:    computers,
+	}
+}
+
+func expandStandardCondition(condition StandardConditions, notifyWhenResolved, notifyOnlyOnTriggeredGroupByValues *bool) *alerts.AlertCondition {
+	switch condition.AlertWhen {
+	case "More":
+		threshold := wrapperspb.Double(condition.Threshold.AsApproximateFloat64())
+		timeFrame := alertSchemaTimeWindowToProtoTimeWindow[string(*condition.TimeWindow)]
+		groupBy := utils.StringSliceToWrappedStringSlice(condition.GroupBy)
+		parameters := &alerts.ConditionParameters{
+			Threshold: threshold,
+			Timeframe: timeFrame,
+			GroupBy:   groupBy,
+		}
+		if notifyWhenResolved != nil {
+			parameters.NotifyOnResolved = wrapperspb.Bool(*notifyWhenResolved)
+		}
+		if notifyOnlyOnTriggeredGroupByValues != nil {
+			parameters.NotifyGroupByOnlyAlerts = wrapperspb.Bool(*notifyOnlyOnTriggeredGroupByValues)
+		}
+		return &alerts.AlertCondition{
+			Condition: &alerts.AlertCondition_MoreThan{
+				MoreThan: &alerts.MoreThanCondition{Parameters: parameters},
+			},
+		}
+	case "Less":
+		threshold := wrapperspb.Double(condition.Threshold.AsApproximateFloat64())
+		timeFrame := alertSchemaTimeWindowToProtoTimeWindow[string(*condition.TimeWindow)]
+		groupBy := utils.StringSliceToWrappedStringSlice(condition.GroupBy)
+		parameters := &alerts.ConditionParameters{
+			Threshold: threshold,
+			Timeframe: timeFrame,
+			GroupBy:   groupBy,
+		}
+		if notifyWhenResolved != nil {
+			parameters.NotifyOnResolved = wrapperspb.Bool(*notifyWhenResolved)
+		}
+		if notifyOnlyOnTriggeredGroupByValues != nil {
+			parameters.NotifyGroupByOnlyAlerts = wrapperspb.Bool(*notifyOnlyOnTriggeredGroupByValues)
+		}
+		if manageUndetectedValues := condition.ManageUndetectedValues; manageUndetectedValues != nil {
+			parameters.RelatedExtendedData.ShouldTriggerDeadman = wrapperspb.Bool(manageUndetectedValues.EnableTriggeringOnUndetectedValues)
+			cleanupDeadmanDuration := alertSchemaDeadmanDurationToProtoDeadmanDuration[*manageUndetectedValues.AutoRetireRatio]
+			parameters.RelatedExtendedData.CleanupDeadmanDuration = &cleanupDeadmanDuration
+		}
+		return &alerts.AlertCondition{
+			Condition: &alerts.AlertCondition_MoreThan{
+				MoreThan: &alerts.MoreThanCondition{Parameters: parameters},
+			},
+		}
+	case "Immediately":
+		return &alerts.AlertCondition{
+			Condition: &alerts.AlertCondition_Immediate{},
+		}
+	case "MoreThanUsual":
+		threshold := wrapperspb.Double(condition.Threshold.AsApproximateFloat64())
+		groupBy := utils.StringSliceToWrappedStringSlice(condition.GroupBy)
+		parameters := &alerts.ConditionParameters{
+			Threshold: threshold,
+			GroupBy:   groupBy,
+		}
+		return &alerts.AlertCondition{
+			Condition: &alerts.AlertCondition_MoreThanUsual{
+				MoreThanUsual: &alerts.MoreThanUsualCondition{Parameters: parameters},
+			},
+		}
+	}
+
+	return nil
+}
+
+func expandActiveWhen(scheduling *Scheduling) *alerts.AlertActiveWhen {
+	if scheduling == nil {
+		return nil
+	}
+
+	daysOfWeek := expandDaysOfWeek(scheduling.DaysEnabled)
+	start := expandTime(scheduling.StartTime)
+	end := expandTime(scheduling.EndTime)
+
+	return &alerts.AlertActiveWhen{
+		Timeframes: []*alerts.AlertActiveTimeframe{
+			{
+				DaysOfWeek: daysOfWeek,
+				Range: &alerts.TimeRange{
+					Start: start,
+					End:   end,
+				},
+			},
+		},
+	}
+}
+
+func expandTime(time *Time) *alerts.Time {
+	if time == nil {
+		return nil
+	}
+
+	timeArr := strings.Split(string(*time), ":")
+	hours, _ := strconv.Atoi(timeArr[0])
+	minutes, _ := strconv.Atoi(timeArr[1])
+
+	return &alerts.Time{
+		Hours:   int32(hours),
+		Minutes: int32(minutes),
+	}
+}
+
+func expandDaysOfWeek(days []Day) []alerts.DayOfWeek {
+	daysOfWeek := make([]alerts.DayOfWeek, 0, len(days))
+	for _, d := range days {
+		daysOfWeek = append(daysOfWeek, alertSchemaDayToProtoDay[d])
+	}
+	return daysOfWeek
+}
+
+func expandMetaLabels(labels map[string]string) []*alerts.MetaLabel {
+	result := make([]*alerts.MetaLabel, 0)
+	for k, v := range labels {
+		result = append(result, &alerts.MetaLabel{
+			Key:   wrapperspb.String(k),
+			Value: wrapperspb.String(v),
+		})
+	}
+	return result
+}
+
+func expandExpirationDate(date *ExpirationDate) *alerts.Date {
+	if date == nil {
+		return nil
+	}
+
+	return &alerts.Date{
+		Year:  date.Year,
+		Month: date.Month,
+		Day:   date.Day,
+	}
+}
+
+func expandNotifications(recipients Recipients) *alerts.AlertNotifications {
+	return &alerts.AlertNotifications{
+		Emails:       emailSliceToWrappedStringSlice(recipients.Emails),
+		Integrations: utils.StringSliceToWrappedStringSlice(recipients.Webhooks),
+	}
+}
+
+func expandNotifyEvery(notifyEveryMin *int) *wrapperspb.DoubleValue {
+	if notifyEveryMin == nil {
+		return nil
+	}
+	return wrapperspb.Double(float64(60 * *notifyEveryMin))
+}
+
+func emailSliceToWrappedStringSlice(arr []Email) []*wrapperspb.StringValue {
+	result := make([]*wrapperspb.StringValue, 0, len(arr))
+	for _, s := range arr {
+		result = append(result, wrapperspb.String(string(s)))
+	}
+	return result
+}
+
+func (in *AlertSpec) DeepEqual(alert *alerts.Alert) (bool, utils.Diff) {
+	return true, utils.Diff{}
+}
+
+func (in *AlertSpec) ExtractUpdateAlertRequest(id string) *alerts.UpdateAlertByUniqueIdRequest {
+	uniqueIdentifier := wrapperspb.String(id)
+	enabled := wrapperspb.Bool(in.Active)
+	name := wrapperspb.String(in.Name)
+	description := wrapperspb.String(in.Description)
+	severity := alertSchemaSeverityToProtoSeverity[in.Severity]
+	metaLabels := expandMetaLabels(in.Labels)
+	expirationDate := expandExpirationDate(in.ExpirationDate)
+	notifications := expandNotifications(in.Notifications.Recipients)
+	notifyEvery := expandNotifyEvery(in.Notifications.NotifyEveryMin)
+	payloadFilters := utils.StringSliceToWrappedStringSlice(in.Notifications.PayloadFilters)
+	activeWhen := expandActiveWhen(in.Scheduling)
+	alertTypeParams := expandAlertType(in.AlertType, in.Notifications.OnTriggerAndResolved,
+		in.Notifications.NotifyOnlyOnTriggeredGroupByValues, in.Notifications.IgnoreInfinity)
+
+	return &alerts.UpdateAlertByUniqueIdRequest{
+		Alert: &alerts.Alert{
+			UniqueIdentifier:           uniqueIdentifier,
+			Name:                       name,
+			Description:                description,
+			IsActive:                   enabled,
+			Severity:                   severity,
+			MetaLabels:                 metaLabels,
+			Expiration:                 expirationDate,
+			Notifications:              notifications,
+			NotifyEvery:                notifyEvery,
+			NotificationPayloadFilters: payloadFilters,
+			ActiveWhen:                 activeWhen,
+			Filters:                    alertTypeParams.filters,
+			Condition:                  alertTypeParams.condition,
+			TracingAlert:               alertTypeParams.tracingAlert,
+		},
+	}
+}
+
+// +kubebuilder:validation:Enum=Info;Warning;Critical;Error
+type AlertSeverity string
+
 type ExpirationDate struct {
 	// +kubebuilder:validation:Minimum:=1
 	// +kubebuilder:validation:Maximum:=31
-	Day int `json:"day,omitempty"`
+	Day int32 `json:"day,omitempty"`
 
 	// +kubebuilder:validation:Minimum:=1
 	// +kubebuilder:validation:Maximum:=12
-	Month int `json:"month,omitempty"`
+	Month int32 `json:"month,omitempty"`
 
 	// +kubebuilder:validation:Minimum:=1
 	// +kubebuilder:validation:Maximum:=9999
-	Year int `json:"day,omitempty"`
+	Year int32 `json:"day,omitempty"`
 }
 
-type Notification struct {
+type Notifications struct {
 	// +optional
 	OnTriggerAndResolved *bool `json:"onTriggerAndResolved,omitempty"`
 
@@ -86,7 +483,7 @@ type Notification struct {
 	NotifyEveryMin *int `json:"NotifyEveryMin,omitempty"`
 
 	// +optional
-	PayloadFields []string `json:"payloadFields,omitempty"`
+	PayloadFilters []string `json:"payloadFilters,omitempty"`
 }
 
 type Recipients struct {
@@ -97,7 +494,7 @@ type Recipients struct {
 	Webhooks []string `json:"webhooks,omitempty"`
 }
 
-// +kubebuilder:validation:Pattern:=^[a-z/d._%+\-]+@[a-z/d.\-]+\.[a-z]{2,4}$
+/* +kubebuilder:validation:Pattern=^[a-z/d._%+\-]+@[a-z/d.\-]+\.[a-z]{2,4}$*/
 type Email string
 
 type Scheduling struct {
@@ -106,18 +503,18 @@ type Scheduling struct {
 
 	DaysEnabled []Day `json:"daysEnabled,omitempty"`
 
-	StartTime Time `json:"startTime,omitempty"`
+	StartTime *Time `json:"startTime,omitempty"`
 
-	EndTime Time `json:"endTime,omitempty"`
+	EndTime *Time `json:"endTime,omitempty"`
 }
 
-// +kubebuilder:validation:Enum=UTC-11;UTC-10";UTC-9;UTC-8;UTC-7;UTC-6;UTC-5;UTC-4;UTC-3;UTC-2;UTC-1;UTC+0;UTC+1;UTC+2;UTC+3;UTC+4;UTC+5;UTC+6;UTC+7;UTC+8;UTC+9;UTC+10;UTC+11;UTC+12;UTC+13;UTC+14
+/* +kubebuilder:validation:Pattern=/^UTC[+-]\d{2}:\d{2}$/g*/
 type TimeZone string
 
 // +kubebuilder:validation:Enum=Sunday;Monday;Tuesday;Wednesday;Thursday;Friday;Saturday;
 type Day string
 
-// +kubebuilder:validation:Pattern:=^(0\d|1\d|2[0-3]):[0-5]\d$
+/* +kubebuilder:validation:Pattern=^(0\d|1\d|2[0-3]):[0-5]\d$*/
 type Time string
 
 type AlertType struct {
@@ -219,7 +616,7 @@ type StandardConditions struct {
 	AlertWhen StandardAlertWhen `json:"alertWhen,omitempty"`
 
 	// +optional
-	Threshold *float64 `json:"threshold,omitempty"`
+	Threshold *resource.Quantity `json:"threshold,omitempty"`
 
 	// +optional
 	TimeWindow *TimeWindow `json:"timeWindow,omitempty"`
@@ -234,7 +631,7 @@ type StandardConditions struct {
 type RatioConditions struct {
 	AlertWhen AlertWhen `json:"alertWhen,omitempty"`
 
-	Ratio float64 `json:"ratio,omitempty"`
+	Ratio resource.Quantity `json:"ratio,omitempty"`
 
 	TimeWindow TimeWindow `json:"timeWindow,omitempty"`
 
@@ -268,8 +665,7 @@ type UniqueCountConditions struct {
 type TimeRelativeConditions struct {
 	AlertWhen AlertWhen `json:"alertWhen,omitempty"`
 
-	// +kubebuilder:validation:Minimum:=0
-	Threshold float64 `json:"threshold,omitempty"`
+	Threshold resource.Quantity `json:"threshold,omitempty"`
 
 	TimeWindow RelativeTimeWindow `json:"timeWindow,omitempty"`
 
@@ -292,10 +688,9 @@ type LuceneConditions struct {
 
 	AlertWhen AlertWhen `json:"alertWhen,omitempty"`
 
-	// +kubebuilder:validation:Minimum:=0
-	Threshold float64 `json:"threshold,omitempty"`
+	Threshold resource.Quantity `json:"threshold,omitempty"`
 
-	// +kubebuilder:validation:Minimum:=0
+	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:MultipleOf:=10
 	SampleThresholdPercentage int `json:"sampleThresholdPercentage,omitempty"`
 
@@ -318,10 +713,9 @@ type LuceneConditions struct {
 type PromqlConditions struct {
 	AlertWhen AlertWhen `json:"alertWhen,omitempty"`
 
-	// +kubebuilder:validation:Minimum:=0
-	Threshold float64 `json:"threshold,omitempty"`
+	Threshold resource.Quantity `json:"threshold,omitempty"`
 
-	// +kubebuilder:validation:Minimum:=0
+	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:MultipleOf:=10
 	SampleThresholdPercentage int `json:"sampleThresholdPercentage,omitempty"`
 
@@ -345,8 +739,7 @@ type TracingCondition struct {
 	AlertWhen TracingAlertWhen `json:"alertWhen,omitempty"`
 
 	// +optional
-	// +kubebuilder:validation:Minimum:=0
-	Threshold float64 `json:"threshold,omitempty"`
+	Threshold resource.Quantity `json:"threshold,omitempty"`
 
 	// +optional
 	TimeWindow TimeWindow `json:"timeWindow,omitempty"`
@@ -355,34 +748,34 @@ type TracingCondition struct {
 	GroupBy []string `json:"groupBy,omitempty"`
 }
 
-// +kubebuilder:validation:Enum=Never;5Min;10Min;1H;2H;6H;12H;24H;
+// +kubebuilder:validation:Enum=Never;FiveMinutes;TenMinutes;Hour;TwoHours;SixHours;TwelveHours;TwentyFourHours
 type AutoRetireRatio string
 
-// +kubebuilder:validation:Enum=More;Less;
+// +kubebuilder:validation:Enum=More;Less
 type AlertWhen string
 
-// +kubebuilder:validation:Enum=More;Less;Immediately;MoreThanUsual;
+// +kubebuilder:validation:Enum=More;Less;Immediately;MoreThanUsual
 type StandardAlertWhen string
 
-// +kubebuilder:validation:Enum=More;Immediately;
+// +kubebuilder:validation:Enum=More;Immediately
 type TracingAlertWhen string
 
-// +kubebuilder:validation:Enum=Q1;Q2;Both;
+// +kubebuilder:validation:Enum=Q1;Q2;Both
 type GroupByFor string
 
-// +kubebuilder:validation:Enum=5Min;10Min;15Min;20Min;30Min;1H;2H;4H;6H;12H;24H;36H;
+// +kubebuilder:validation:Enum=FiveMinutes;TenMinutes;FifteenMinutes;TwentyMinutes;ThirtyMinutes;Hour;TwoHours;FourHours;SixHours;TwelveHours;TwentyFourHours;ThirtySixHours
 type TimeWindow string
 
-// +kubebuilder:validation:Enum=12H;24H;48H;72H;1W;1Month;2Month;3Month;
+// +kubebuilder:validation:Enum=TwelveHours;TwentyFourHours;FortyEightHours;SeventTwoHours;Week;Month;TwoMonths;ThreeMonths;
 type NewValueTimeWindow string
 
-// +kubebuilder:validation:Enum=1Min:5Min;10Min;15Min;20Min;30Min;1H;2H;4H;6H;12H;24H;36H;
+// +kubebuilder:validation:Enum=Minute;FiveMinutes;TenMinutes;FifteenMinutes;TwentyMinutes;ThirtyMinutes;Hour;TwoHours;FourHours;SixHours;TwelveHours;TwentyFourHours;ThirtySixHours
 type UniqueValueTimeWindow string
 
-// +kubebuilder:validation:Enum=1Min:5Min;10Min;15Min;20Min;30Min;1H;2H;4H;6H;12H;24H;
+// +kubebuilder:validation:Enum=Minute;FiveMinutes;TenMinutes;FifteenMinutes;TwentyMinutes;ThirtyMinutes;Hour;TwoHours;FourHours;SixHours;TwelveHours;TwentyFourHours
 type MetricTimeWindow string
 
-// +kubebuilder:validation:Enum=Previous_hour;SameHourYesterday;SameHourLastWeek;Yesterday;SameDayLastWeek;SameDayLastMonth;
+// +kubebuilder:validation:Enum=PreviousHour;SameHourYesterday;SameHourLastWeek;Yesterday;SameDayLastWeek;SameDayLastMonth;
 type RelativeTimeWindow string
 
 type Filters struct {
@@ -390,7 +783,7 @@ type Filters struct {
 	SearchQuery *string `json:"searchQuery,omitempty"`
 
 	// +optional
-	Severities []utils.Severity `json:"severities,omitempty"`
+	Severities []FiltersLogSeverity `json:"severities,omitempty"`
 
 	// +optional
 	Applications []string `json:"applications,omitempty"`
@@ -414,6 +807,9 @@ type Filters struct {
 	IPs []string `json:"ips,omitempty"`
 }
 
+// +kubebuilder:validation:Enum=Debug;Verbose;Info;Warning;Critical;Error;
+type FiltersLogSeverity string
+
 type TracingFilters struct {
 	LatencyThresholdMS int `json:"latencyThresholdMS,omitempty"`
 
@@ -436,10 +832,10 @@ type FieldFilter struct {
 	Operator FilterOperator     `json:"operator,omitempty"`
 }
 
-// +kubebuilder:validation:Enum=Equals:Contains;StartWith;EndWith;
+// +kubebuilder:validation:Enum=Equals;Contains;StartWith;EndWith;
 type FilterOperator string
 
-// +kubebuilder:validation:Enum=Application:Subsystem;Service;
+// +kubebuilder:validation:Enum=Application;Subsystem;Service;
 type FieldFilterValue string
 
 type ManageUndetectedValues struct {
@@ -478,7 +874,7 @@ type SubAlert struct {
 	UserAlertId string `json:"userAlertId,omitempty"`
 }
 
-// +kubebuilder:validation:Enum=And:Or;
+// +kubebuilder:validation:Enum=And;Or
 type FlowStageGroupOperator string
 
 // AlertStatus defines the observed state of Alert

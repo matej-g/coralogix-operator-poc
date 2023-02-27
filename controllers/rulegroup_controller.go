@@ -18,7 +18,6 @@ package controllers
 
 import (
 	"context"
-	"time"
 
 	"coralogix-operator-poc/controllers/clientset"
 	rulesgroups "coralogix-operator-poc/controllers/clientset/grpc/rules-groups/v1"
@@ -33,11 +32,6 @@ import (
 
 	coralogixv1 "coralogix-operator-poc/api/v1"
 	"google.golang.org/grpc/status"
-)
-
-const (
-	defaultRequeuePeriod    = 60 * time.Second
-	defaultErrRequeuePeriod = 5 * time.Second
 )
 
 // RuleGroupReconciler reconciles a RuleGroup object
@@ -154,7 +148,7 @@ func (r *RuleGroupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	if equal, diff := ruleGroupCRD.Spec.DeepEqual(actualState.RuleGroup); !equal {
 		log.V(1).Info("Find diffs between spec and the actual state", "Diff", diff)
 		updateRuleGroupReq := ruleGroupCRD.Spec.ExtractUpdateRuleGroupRequest(*ruleGroupCRD.Status.ID)
-		updateRuleGroupResp, err := r.CoralogixClientSet.RuleGroups().UpdateRuleGroup(ctx, updateRuleGroupReq)
+		updateRuleGroupResp, err := rulesGroupsClient.UpdateRuleGroup(ctx, updateRuleGroupReq)
 		if err != nil {
 			log.Error(err, "Received an error while updating a Rule-Group", "ruleGroup", updateRuleGroupReq)
 			return ctrl.Result{RequeueAfter: defaultErrRequeuePeriod}, err
