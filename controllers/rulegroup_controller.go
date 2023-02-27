@@ -93,6 +93,12 @@ func (r *RuleGroupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		// The object is being deleted
 		if controllerutil.ContainsFinalizer(ruleGroupCRD, myFinalizerName) {
 			// our finalizer is present, so lets handle any external dependency
+			if ruleGroupCRD.Status.ID == nil {
+				controllerutil.RemoveFinalizer(ruleGroupCRD, myFinalizerName)
+				err := r.Update(ctx, ruleGroupCRD)
+				return ctrl.Result{}, err
+			}
+
 			ruleGroupId := *ruleGroupCRD.Status.ID
 			deleteRuleGroupReq := &rulesgroups.DeleteRuleGroupRequest{GroupId: ruleGroupId}
 			log.V(1).Info("Deleting Rule-Group", "Rule-Group ID", ruleGroupId)
