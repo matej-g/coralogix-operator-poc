@@ -149,7 +149,7 @@ type alertTypeParams struct {
 	tracingAlert *alerts.TracingAlert
 }
 
-func expandAlertType(alertType AlertType, onTriggerAndResolved, notifyOnlyOnTriggeredGroupByValues, ignoreInfinity *bool) alertTypeParams {
+func expandAlertType(alertType AlertType, onTriggerAndResolved, notifyOnlyOnTriggeredGroupByValues, ignoreInfinity bool) alertTypeParams {
 	if standard := alertType.Standard; standard != nil {
 		return expandStandard(standard, onTriggerAndResolved, notifyOnlyOnTriggeredGroupByValues)
 	} else if ratio := alertType.Ratio; ratio != nil {
@@ -171,7 +171,7 @@ func expandAlertType(alertType AlertType, onTriggerAndResolved, notifyOnlyOnTrig
 	return alertTypeParams{}
 }
 
-func expandStandard(standard *Standard, notifyWhenResolved, notifyOnlyOnTriggeredGroupByValues *bool) alertTypeParams {
+func expandStandard(standard *Standard, notifyWhenResolved, notifyOnlyOnTriggeredGroupByValues bool) alertTypeParams {
 	condition := expandStandardCondition(standard.Conditions, notifyWhenResolved, notifyOnlyOnTriggeredGroupByValues)
 	filters := expandStandardFilters(standard.Filters)
 	return alertTypeParams{
@@ -180,7 +180,7 @@ func expandStandard(standard *Standard, notifyWhenResolved, notifyOnlyOnTriggere
 	}
 }
 
-func expandRatio(ratio *Ratio, notifyWhenResolved, notifyOnlyOnTriggeredGroupByValues, ignoreInfinity *bool) alertTypeParams {
+func expandRatio(ratio *Ratio, notifyWhenResolved, notifyOnlyOnTriggeredGroupByValues, ignoreInfinity bool) alertTypeParams {
 	return alertTypeParams{}
 }
 
@@ -192,15 +192,15 @@ func expandUniqueCount(count *UniqueCount) alertTypeParams {
 	return alertTypeParams{}
 }
 
-func expandTimeRelative(timeRelative *TimeRelative, notifyWhenResolved, notifyOnlyOnTriggeredGroupByValues, ignoreInfinity *bool) alertTypeParams {
+func expandTimeRelative(timeRelative *TimeRelative, notifyWhenResolved, notifyOnlyOnTriggeredGroupByValues, ignoreInfinity bool) alertTypeParams {
 	return alertTypeParams{}
 }
 
-func expandMetric(metric *Metric, notifyWhenResolved, notifyOnlyOnTriggeredGroupByValues *bool) alertTypeParams {
+func expandMetric(metric *Metric, notifyWhenResolved, notifyOnlyOnTriggeredGroupByValues bool) alertTypeParams {
 	return alertTypeParams{}
 }
 
-func expandTracing(tracing *Tracing, notifyWhenResolved *bool) alertTypeParams {
+func expandTracing(tracing *Tracing, notifyWhenResolved bool) alertTypeParams {
 	return alertTypeParams{}
 }
 
@@ -252,7 +252,7 @@ func expandMetadata(filters *Filters) *alerts.AlertFilters_MetadataFilters {
 	}
 }
 
-func expandStandardCondition(condition StandardConditions, notifyWhenResolved, notifyOnlyOnTriggeredGroupByValues *bool) *alerts.AlertCondition {
+func expandStandardCondition(condition StandardConditions, notifyWhenResolved, notifyOnlyOnTriggeredGroupByValues bool) *alerts.AlertCondition {
 	switch condition.AlertWhen {
 	case "More":
 		threshold := wrapperspb.Double(float64(*condition.Threshold))
@@ -263,12 +263,8 @@ func expandStandardCondition(condition StandardConditions, notifyWhenResolved, n
 			Timeframe: timeFrame,
 			GroupBy:   groupBy,
 		}
-		if notifyWhenResolved != nil {
-			parameters.NotifyOnResolved = wrapperspb.Bool(*notifyWhenResolved)
-		}
-		if notifyOnlyOnTriggeredGroupByValues != nil {
-			parameters.NotifyGroupByOnlyAlerts = wrapperspb.Bool(*notifyOnlyOnTriggeredGroupByValues)
-		}
+		parameters.NotifyOnResolved = wrapperspb.Bool(notifyWhenResolved)
+		parameters.NotifyGroupByOnlyAlerts = wrapperspb.Bool(notifyOnlyOnTriggeredGroupByValues)
 		return &alerts.AlertCondition{
 			Condition: &alerts.AlertCondition_MoreThan{
 				MoreThan: &alerts.MoreThanCondition{Parameters: parameters},
@@ -283,12 +279,10 @@ func expandStandardCondition(condition StandardConditions, notifyWhenResolved, n
 			Timeframe: timeFrame,
 			GroupBy:   groupBy,
 		}
-		if notifyWhenResolved != nil {
-			parameters.NotifyOnResolved = wrapperspb.Bool(*notifyWhenResolved)
-		}
-		if notifyOnlyOnTriggeredGroupByValues != nil {
-			parameters.NotifyGroupByOnlyAlerts = wrapperspb.Bool(*notifyOnlyOnTriggeredGroupByValues)
-		}
+
+		parameters.NotifyOnResolved = wrapperspb.Bool(notifyWhenResolved)
+		parameters.NotifyGroupByOnlyAlerts = wrapperspb.Bool(notifyOnlyOnTriggeredGroupByValues)
+
 		if manageUndetectedValues := condition.ManageUndetectedValues; manageUndetectedValues != nil {
 			parameters.RelatedExtendedData = new(alerts.RelatedExtendedData)
 			parameters.RelatedExtendedData.ShouldTriggerDeadman = wrapperspb.Bool(manageUndetectedValues.EnableTriggeringOnUndetectedValues)
@@ -567,13 +561,13 @@ func (in *ExpirationDate) DeepEqual(date *alerts.Date) bool {
 
 type Notifications struct {
 	//+kubebuilder:default=false
-	OnTriggerAndResolved *bool `json:"onTriggerAndResolved,omitempty"`
+	OnTriggerAndResolved bool `json:"onTriggerAndResolved,omitempty"`
 
 	//+kubebuilder:default=false
-	IgnoreInfinity *bool `json:"ignoreInfinity,omitempty"`
+	IgnoreInfinity bool `json:"ignoreInfinity,omitempty"`
 
 	//+kubebuilder:default=false
-	NotifyOnlyOnTriggeredGroupByValues *bool `json:"notifyOnlyOnTriggeredGroupByValues,omitempty"`
+	NotifyOnlyOnTriggeredGroupByValues bool `json:"notifyOnlyOnTriggeredGroupByValues,omitempty"`
 
 	// +optional
 	Recipients Recipients `json:"recipients,omitempty"`
@@ -622,44 +616,26 @@ func (in *Notifications) DeepEqual(actualRecipients *alerts.AlertNotifications,
 		}
 	}
 
-	if in.OnTriggerAndResolved == nil && actualNotifyAlertTypeData.onTriggerAndResolved != nil {
+	if actualOnTriggerAndResolved := actualNotifyAlertTypeData.onTriggerAndResolved.GetValue(); in.OnTriggerAndResolved != actualOnTriggerAndResolved {
 		return false, utils.Diff{
 			Name:    "OnTriggerAndResolved",
 			Desired: in.OnTriggerAndResolved,
-			Actual:  actualNotifyAlertTypeData.onTriggerAndResolved.GetValue(),
-		}
-	} else if actualOnTriggerAndResolved := actualNotifyAlertTypeData.onTriggerAndResolved.GetValue(); *in.OnTriggerAndResolved != actualOnTriggerAndResolved {
-		return false, utils.Diff{
-			Name:    "OnTriggerAndResolved",
-			Desired: *in.OnTriggerAndResolved,
 			Actual:  actualOnTriggerAndResolved,
 		}
 	}
 
-	if in.NotifyOnlyOnTriggeredGroupByValues == nil && actualNotifyAlertTypeData.notifyOnlyOnTriggeredGroupByValues != nil {
+	if actualNotifyOnlyOnTriggeredGroupByValues := actualNotifyAlertTypeData.notifyOnlyOnTriggeredGroupByValues.GetValue(); in.NotifyOnlyOnTriggeredGroupByValues != actualNotifyOnlyOnTriggeredGroupByValues {
 		return false, utils.Diff{
 			Name:    "NotifyOnlyOnTriggeredGroupByValues",
 			Desired: in.NotifyOnlyOnTriggeredGroupByValues,
-			Actual:  actualNotifyAlertTypeData.notifyOnlyOnTriggeredGroupByValues.GetValue(),
-		}
-	} else if actualNotifyOnlyOnTriggeredGroupByValues := actualNotifyAlertTypeData.notifyOnlyOnTriggeredGroupByValues.GetValue(); *in.NotifyOnlyOnTriggeredGroupByValues != actualNotifyOnlyOnTriggeredGroupByValues {
-		return false, utils.Diff{
-			Name:    "NotifyOnlyOnTriggeredGroupByValues",
-			Desired: *in.NotifyOnlyOnTriggeredGroupByValues,
 			Actual:  actualNotifyOnlyOnTriggeredGroupByValues,
 		}
 	}
 
-	if in.IgnoreInfinity == nil && actualNotifyAlertTypeData.ignoreInfinity != nil {
+	if actualIgnoreInfinity := actualNotifyAlertTypeData.ignoreInfinity.GetValue(); in.IgnoreInfinity != actualIgnoreInfinity {
 		return false, utils.Diff{
 			Name:    "IgnoreInfinity",
 			Desired: in.IgnoreInfinity,
-			Actual:  actualNotifyAlertTypeData.ignoreInfinity.GetValue(),
-		}
-	} else if actualIgnoreInfinity := actualNotifyAlertTypeData.ignoreInfinity.GetValue(); *in.IgnoreInfinity != actualIgnoreInfinity {
-		return false, utils.Diff{
-			Name:    "IgnoreInfinity",
-			Desired: *in.IgnoreInfinity,
 			Actual:  actualIgnoreInfinity,
 		}
 	}
@@ -910,9 +886,11 @@ type StandardConditions struct {
 }
 
 func (in *StandardConditions) DeepEqual(condition *alerts.AlertCondition, data *notificationsAlertTypeData) (bool, utils.Diff) {
+	var conditionParameters *alerts.ConditionParameters
+
 	switch condition.GetCondition().(type) {
 	case *alerts.AlertCondition_LessThan:
-		lessThanParams := condition.GetLessThan().GetParameters()
+		conditionParameters = condition.GetLessThan().GetParameters()
 		if alertWhen := in.AlertWhen; alertWhen != "Less" {
 			return false, utils.Diff{
 				Name:    "AlertWhen",
@@ -920,28 +898,28 @@ func (in *StandardConditions) DeepEqual(condition *alerts.AlertCondition, data *
 				Actual:  "Less",
 			}
 		}
-		if threshold, actualThreshold := float64(*(in.Threshold)), lessThanParams.GetThreshold().GetValue(); threshold != actualThreshold {
+		if threshold, actualThreshold := float64(*(in.Threshold)), conditionParameters.GetThreshold().GetValue(); threshold != actualThreshold {
 			return false, utils.Diff{
 				Name:    "Threshold",
 				Desired: threshold,
 				Actual:  actualThreshold,
 			}
 		}
-		if timeWindow, actualTimeWindow := alertSchemaTimeWindowToProtoTimeWindow[string(*in.TimeWindow)], lessThanParams.GetTimeframe(); timeWindow != actualTimeWindow {
+		if timeWindow, actualTimeWindow := alertSchemaTimeWindowToProtoTimeWindow[string(*in.TimeWindow)], conditionParameters.GetTimeframe(); timeWindow != actualTimeWindow {
 			return false, utils.Diff{
 				Name:    "TimeWindow",
 				Desired: timeWindow,
 				Actual:  actualTimeWindow,
 			}
 		}
-		if groupBy, actualGroupBy := in.GroupBy, utils.WrappedStringSliceToStringSlice(lessThanParams.GetGroupBy()); !utils.SlicesWithUniqueValuesEqual(groupBy, actualGroupBy) {
+		if groupBy, actualGroupBy := in.GroupBy, utils.WrappedStringSliceToStringSlice(conditionParameters.GetGroupBy()); !utils.SlicesWithUniqueValuesEqual(groupBy, actualGroupBy) {
 			return false, utils.Diff{
 				Name:    "GroupBy",
 				Desired: groupBy,
 				Actual:  actualGroupBy,
 			}
 		}
-		if manageUndetectedValues, actualManageUndetectedValues := in.ManageUndetectedValues, lessThanParams.GetRelatedExtendedData(); manageUndetectedValues == nil && actualManageUndetectedValues != nil {
+		if manageUndetectedValues, actualManageUndetectedValues := in.ManageUndetectedValues, conditionParameters.GetRelatedExtendedData(); manageUndetectedValues == nil && actualManageUndetectedValues != nil {
 			return false, utils.Diff{
 				Name:    "ManageUndetectedValues",
 				Desired: manageUndetectedValues,
@@ -954,18 +932,82 @@ func (in *StandardConditions) DeepEqual(condition *alerts.AlertCondition, data *
 				Actual:  diff.Actual,
 			}
 		}
-
-		data.notifyOnlyOnTriggeredGroupByValues = lessThanParams.NotifyGroupByOnlyAlerts
-		data.onTriggerAndResolved = lessThanParams.NotifyOnResolved
-		data.ignoreInfinity = lessThanParams.IgnoreInfinity
-
-		return true, utils.Diff{}
 	case *alerts.AlertCondition_MoreThan:
+		conditionParameters = condition.GetMoreThan().GetParameters()
+		if alertWhen := in.AlertWhen; alertWhen != "More" {
+			return false, utils.Diff{
+				Name:    "AlertWhen",
+				Desired: alertWhen,
+				Actual:  "More",
+			}
+		}
+		if threshold, actualThreshold := float64(*(in.Threshold)), conditionParameters.GetThreshold().GetValue(); threshold != actualThreshold {
+			return false, utils.Diff{
+				Name:    "Threshold",
+				Desired: threshold,
+				Actual:  actualThreshold,
+			}
+		}
+		if timeWindow, actualTimeWindow := alertSchemaTimeWindowToProtoTimeWindow[string(*in.TimeWindow)], conditionParameters.GetTimeframe(); timeWindow != actualTimeWindow {
+			return false, utils.Diff{
+				Name:    "TimeWindow",
+				Desired: timeWindow,
+				Actual:  actualTimeWindow,
+			}
+		}
+		if groupBy, actualGroupBy := in.GroupBy, utils.WrappedStringSliceToStringSlice(conditionParameters.GetGroupBy()); !utils.SlicesWithUniqueValuesEqual(groupBy, actualGroupBy) {
+			return false, utils.Diff{
+				Name:    "GroupBy",
+				Desired: groupBy,
+				Actual:  actualGroupBy,
+			}
+		}
+		return true, utils.Diff{}
 	case *alerts.AlertCondition_MoreThanUsual:
+		conditionParameters = condition.GetMoreThanUsual().GetParameters()
+		if alertWhen := in.AlertWhen; alertWhen != "MoreThanUsual" {
+			return false, utils.Diff{
+				Name:    "AlertWhen",
+				Desired: alertWhen,
+				Actual:  "MoreThanUsual",
+			}
+		}
+		if threshold, actualThreshold := float64(*(in.Threshold)), conditionParameters.GetThreshold().GetValue(); threshold != actualThreshold {
+			return false, utils.Diff{
+				Name:    "Threshold",
+				Desired: threshold,
+				Actual:  actualThreshold,
+			}
+		}
+		if groupBy, actualGroupBy := in.GroupBy, utils.WrappedStringSliceToStringSlice(conditionParameters.GetGroupBy()); !utils.SlicesWithUniqueValuesEqual(groupBy, actualGroupBy) {
+			return false, utils.Diff{
+				Name:    "GroupBy",
+				Desired: groupBy,
+				Actual:  actualGroupBy,
+			}
+		}
 	case *alerts.AlertCondition_Immediate:
-
+		conditionParameters = condition.GetMoreThanUsual().GetParameters()
+		if alertWhen := in.AlertWhen; alertWhen != "Immediately" {
+			return false, utils.Diff{
+				Name:    "AlertWhen",
+				Desired: alertWhen,
+				Actual:  "Immediately",
+			}
+		}
+		if groupBy, actualGroupBy := in.GroupBy, utils.WrappedStringSliceToStringSlice(conditionParameters.GetGroupBy()); !utils.SlicesWithUniqueValuesEqual(groupBy, actualGroupBy) {
+			return false, utils.Diff{
+				Name:    "GroupBy",
+				Desired: groupBy,
+				Actual:  actualGroupBy,
+			}
+		}
 	}
-	return false, utils.Diff{}
+
+	data.notifyOnlyOnTriggeredGroupByValues = conditionParameters.NotifyGroupByOnlyAlerts
+	data.onTriggerAndResolved = conditionParameters.NotifyOnResolved
+	data.ignoreInfinity = conditionParameters.IgnoreInfinity
+	return true, utils.Diff{}
 }
 
 type RatioConditions struct {

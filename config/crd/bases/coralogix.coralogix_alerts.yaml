@@ -787,13 +787,16 @@ spec:
               notifications:
                 properties:
                   ignoreInfinity:
+                    default: false
                     type: boolean
                   notifyEveryMin:
                     minimum: 1
                     type: integer
                   notifyOnlyOnTriggeredGroupByValues:
+                    default: false
                     type: boolean
                   onTriggerAndResolved:
+                    default: false
                     type: boolean
                   payloadFilters:
                     items:

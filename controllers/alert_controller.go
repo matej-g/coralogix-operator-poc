@@ -146,9 +146,9 @@ func (r *AlertReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		log.V(1).Info("Creating Alert", "alert", jstr)
 		if createAlertResp, err := alertsClient.CreateAlert(ctx, createAlertReq); err == nil {
 			jstr, _ := jsm.MarshalToString(createAlertResp)
-			log.V(1).Info("Alert was updated", "alert", jstr)
+			log.V(1).Info("Alert was created", "alert", jstr)
 			alertCRD.Status.ID = new(string)
-			*alertCRD.Status.ID = createAlertResp.GetAlert().GetId().GetValue()
+			*alertCRD.Status.ID = createAlertResp.GetAlert().GetUniqueIdentifier().GetValue()
 			r.Status().Update(ctx, alertCRD)
 			return ctrl.Result{RequeueAfter: defaultRequeuePeriod}, nil
 		} else {

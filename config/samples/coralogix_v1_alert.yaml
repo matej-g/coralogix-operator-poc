@@ -32,10 +32,7 @@ spec:
         subsystems: [ "filter:startsWith:subsystem-name" ]
         severities: [ "Warning", "Info" ]
       conditions:
-        alertWhen: Less
+        alertWhen: More
         threshold: 5
         timeWindow: FiveMinutes
         groupBy: [ "coralogix.metadata.sdkId" ]
-        manageUndetectedValues:
-          enableTriggeringOnUndetectedValues: true
-          autoRetireRatio: FiveMinutes
