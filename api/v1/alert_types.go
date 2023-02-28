@@ -17,6 +17,7 @@ limitations under the License.
 package v1
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -61,7 +62,7 @@ var (
 		"TwentyFourHours": alerts.Timeframe_TIMEFRAME_24_H,
 		"ThirtySixHours":  alerts.Timeframe_TIMEFRAME_36_H,
 	}
-	alertSchemaDeadmanDurationToProtoDeadmanDuration = map[AutoRetireRatio]alerts.CleanupDeadmanDuration{
+	alertSchemaAutoRetireRatioToProtoAutoRetireRatio = map[AutoRetireRatio]alerts.CleanupDeadmanDuration{
 		"Never":           alerts.CleanupDeadmanDuration_CLEANUP_DEADMAN_DURATION_NEVER_OR_UNSPECIFIED,
 		"FiveMinutes":     alerts.CleanupDeadmanDuration_CLEANUP_DEADMAN_DURATION_5MIN,
 		"TenMinutes":      alerts.CleanupDeadmanDuration_CLEANUP_DEADMAN_DURATION_10MIN,
@@ -291,8 +292,8 @@ func expandStandardCondition(condition StandardConditions, notifyWhenResolved, n
 		if manageUndetectedValues := condition.ManageUndetectedValues; manageUndetectedValues != nil {
 			parameters.RelatedExtendedData = new(alerts.RelatedExtendedData)
 			parameters.RelatedExtendedData.ShouldTriggerDeadman = wrapperspb.Bool(manageUndetectedValues.EnableTriggeringOnUndetectedValues)
-			cleanupDeadmanDuration := alertSchemaDeadmanDurationToProtoDeadmanDuration[*manageUndetectedValues.AutoRetireRatio]
-			parameters.RelatedExtendedData.CleanupDeadmanDuration = &cleanupDeadmanDuration
+			cleanupAutoRetireRatio := alertSchemaAutoRetireRatioToProtoAutoRetireRatio[*manageUndetectedValues.AutoRetireRatio]
+			parameters.RelatedExtendedData.CleanupDeadmanDuration = &cleanupAutoRetireRatio
 		}
 		return &alerts.AlertCondition{
 			Condition: &alerts.AlertCondition_LessThan{
@@ -390,7 +391,7 @@ func expandExpirationDate(date *ExpirationDate) *alerts.Date {
 
 func expandNotifications(recipients Recipients) *alerts.AlertNotifications {
 	return &alerts.AlertNotifications{
-		Emails:       emailSliceToWrappedStringSlice(recipients.Emails),
+		Emails:       utils.StringSliceToWrappedStringSlice(recipients.Emails),
 		Integrations: utils.StringSliceToWrappedStringSlice(recipients.Webhooks),
 	}
 }
@@ -402,16 +403,110 @@ func expandNotifyEvery(notifyEveryMin *int) *wrapperspb.DoubleValue {
 	return wrapperspb.Double(float64(60 * *notifyEveryMin))
 }
 
-func emailSliceToWrappedStringSlice(arr []Email) []*wrapperspb.StringValue {
-	result := make([]*wrapperspb.StringValue, 0, len(arr))
-	for _, s := range arr {
-		result = append(result, wrapperspb.String(string(s)))
+//func emailSliceToWrappedStringSlice(arr []Email) []*wrapperspb.StringValue {
+//	result := make([]*wrapperspb.StringValue, 0, len(arr))
+//	for _, s := range arr {
+//		result = append(result, wrapperspb.String(string(s)))
+//	}
+//	return result
+//}
+
+func (in *AlertSpec) DeepEqual(actualAlert *alerts.Alert) (bool, utils.Diff) {
+	if actualName := actualAlert.GetName().GetValue(); actualName != in.Name {
+		return false, utils.Diff{
+			Name:    "Name",
+			Desired: in.Name,
+			Actual:  actualName,
+		}
 	}
-	return result
+
+	if actualDescription := actualAlert.GetDescription().GetValue(); actualDescription != in.Description {
+		return false, utils.Diff{
+			Name:    "Description",
+			Desired: in.Description,
+			Actual:  actualDescription,
+		}
+	}
+
+	if actualActive := actualAlert.GetIsActive().GetValue(); actualActive != in.Active {
+		return false, utils.Diff{
+			Name:    "Active",
+			Desired: in.Active,
+			Actual:  actualActive,
+		}
+	}
+
+	if actualSeverity := actualAlert.GetSeverity(); actualSeverity != alertSchemaSeverityToProtoSeverity[in.Severity] {
+		return false, utils.Diff{
+			Name:    "Severity",
+			Desired: in.Severity,
+			Actual:  actualSeverity.String(),
+		}
+	}
+
+	if !equalLabels(in.Labels, actualAlert.MetaLabels) {
+		return false, utils.Diff{
+			Name:    "Labels",
+			Desired: in.Labels,
+			Actual:  actualAlert.MetaLabels,
+		}
+	}
+
+	if expirationDate, actualExpirationDate := in.ExpirationDate, actualAlert.GetExpiration(); expirationDate == nil && actualExpirationDate != nil {
+		return false, utils.Diff{
+			Name:    "ExpirationDate",
+			Desired: in.ExpirationDate,
+			Actual:  *actualExpirationDate,
+		}
+	} else if expirationDate != nil && !expirationDate.DeepEqual(actualExpirationDate) {
+		return false, utils.Diff{
+			Name:    "ExpirationDate",
+			Desired: *in.ExpirationDate,
+			Actual:  *actualExpirationDate,
+		}
+	}
+
+	var notifyData notificationsAlertTypeData
+	if equal, diff := in.AlertType.DeepEqual(actualAlert, &notifyData); !equal {
+		return false, utils.Diff{
+			Name:    fmt.Sprintf("AlertType.%s", diff.Name),
+			Desired: diff.Desired,
+			Actual:  diff.Actual,
+		}
+	}
+
+	if equal, diff := in.Notifications.DeepEqual(actualAlert.GetNotifications(),
+		actualAlert.GetNotificationPayloadFilters(), actualAlert.GetNotifyEvery(), notifyData); !equal {
+		return false, utils.Diff{
+			Name:    fmt.Sprintf("Notifications.%s", diff.Name),
+			Desired: diff.Desired,
+			Actual:  diff.Actual,
+		}
+	}
+
+	return true, utils.Diff{}
 }
 
-func (in *AlertSpec) DeepEqual(alert *alerts.Alert) (bool, utils.Diff) {
-	return true, utils.Diff{}
+type notificationsAlertTypeData struct {
+	onTriggerAndResolved *wrapperspb.BoolValue
+
+	notifyOnlyOnTriggeredGroupByValues *wrapperspb.BoolValue
+
+	ignoreInfinity *wrapperspb.BoolValue
+}
+
+func equalLabels(labels map[string]string, actualLabels []*alerts.MetaLabel) bool {
+	if len(labels) != len(actualLabels) {
+		return false
+	}
+
+	for _, label := range actualLabels {
+		if value, ok := labels[label.GetKey().GetValue()]; !ok || value != label.GetValue().GetValue() {
+			return false
+		}
+	}
+
+	return true
 }
 
 func (in *AlertSpec) ExtractUpdateAlertRequest(id string) *alerts.UpdateAlertByUniqueIdRequest {
@@ -466,14 +561,18 @@ type ExpirationDate struct {
 	Year int32 `json:"year,omitempty"`
 }
 
+func (in *ExpirationDate) DeepEqual(date *alerts.Date) bool {
+	return in.Year != date.Year || in.Month != date.Month || in.Day != date.Day
+}
+
 type Notifications struct {
-	// +optional
+	//+kubebuilder:default=false
 	OnTriggerAndResolved *bool `json:"onTriggerAndResolved,omitempty"`
 
-	// +optional
+	//+kubebuilder:default=false
 	IgnoreInfinity *bool `json:"ignoreInfinity,omitempty"`
 
-	// +optional
+	//+kubebuilder:default=false
 	NotifyOnlyOnTriggeredGroupByValues *bool `json:"notifyOnlyOnTriggeredGroupByValues,omitempty"`
 
 	// +optional
@@ -487,16 +586,94 @@ type Notifications struct {
 	PayloadFilters []string `json:"payloadFilters,omitempty"`
 }
 
+func (in *Notifications) DeepEqual(actualRecipients *alerts.AlertNotifications,
+	actualNotifyPayloadFilters []*wrapperspb.StringValue, actualNotifyEvery *wrapperspb.DoubleValue,
+	actualNotifyAlertTypeData notificationsAlertTypeData) (bool, utils.Diff) {
+
+	if emails, actualEmails := in.Recipients.Emails, utils.WrappedStringSliceToStringSlice(actualRecipients.Emails); !utils.SlicesWithUniqueValuesEqual(emails, actualEmails) {
+		return false, utils.Diff{
+			Name: "Emails",
+		}
+	}
+
+	if webhooks, actualWebhooks := in.Recipients.Webhooks, utils.WrappedStringSliceToStringSlice(actualRecipients.Integrations); !utils.SlicesWithUniqueValuesEqual(webhooks, actualWebhooks) {
+		return false, utils.Diff{
+			Name: "Webhooks",
+		}
+	}
+
+	if actualNotifyPayloadFilters := utils.WrappedStringSliceToStringSlice(actualNotifyPayloadFilters); !utils.SlicesWithUniqueValuesEqual(in.PayloadFilters, actualNotifyPayloadFilters) {
+		return false, utils.Diff{
+			Name: "PayloadFilters",
+		}
+	}
+
+	if in.NotifyEveryMin == nil && actualNotifyEvery != nil {
+		return false, utils.Diff{
+			Name:    "NotifyEveryMin",
+			Desired: in.NotifyEveryMin,
+			Actual:  actualNotifyEvery.GetValue(),
+		}
+	} else if desiredNotifyEverySec := float64(*in.NotifyEveryMin) * 60; actualNotifyEvery.GetValue() != desiredNotifyEverySec {
+		return false, utils.Diff{
+			Name:    "NotifyEveryMin",
+			Desired: fmt.Sprintf("%d (minutes)", *in.NotifyEveryMin),
+			Actual:  fmt.Sprintf("%f (seconds)", actualNotifyEvery.GetValue()),
+		}
+	}
+
+	if in.OnTriggerAndResolved == nil && actualNotifyAlertTypeData.onTriggerAndResolved != nil {
+		return false, utils.Diff{
+			Name:    "OnTriggerAndResolved",
+			Desired: in.OnTriggerAndResolved,
+			Actual:  actualNotifyAlertTypeData.onTriggerAndResolved.GetValue(),
+		}
+	} else if actualOnTriggerAndResolved := actualNotifyAlertTypeData.onTriggerAndResolved.GetValue(); *in.OnTriggerAndResolved != actualOnTriggerAndResolved {
+		return false, utils.Diff{
+			Name:    "OnTriggerAndResolved",
+			Desired: *in.OnTriggerAndResolved,
+			Actual:  actualOnTriggerAndResolved,
+		}
+	}
+
+	if in.NotifyOnlyOnTriggeredGroupByValues == nil && actualNotifyAlertTypeData.notifyOnlyOnTriggeredGroupByValues != nil {
+		return false, utils.Diff{
+			Name:    "NotifyOnlyOnTriggeredGroupByValues",
+			Desired: in.NotifyOnlyOnTriggeredGroupByValues,
+			Actual:  actualNotifyAlertTypeData.notifyOnlyOnTriggeredGroupByValues.GetValue(),
+		}
+	} else if actualNotifyOnlyOnTriggeredGroupByValues := actualNotifyAlertTypeData.notifyOnlyOnTriggeredGroupByValues.GetValue(); *in.NotifyOnlyOnTriggeredGroupByValues != actualNotifyOnlyOnTriggeredGroupByValues {
+		return false, utils.Diff{
+			Name:    "NotifyOnlyOnTriggeredGroupByValues",
+			Desired: *in.NotifyOnlyOnTriggeredGroupByValues,
+			Actual:  actualNotifyOnlyOnTriggeredGroupByValues,
+		}
+	}
+
+	if in.IgnoreInfinity == nil && actualNotifyAlertTypeData.ignoreInfinity != nil {
+		return false, utils.Diff{
+			Name:    "IgnoreInfinity",
+			Desired: in.IgnoreInfinity,
+			Actual:  actualNotifyAlertTypeData.ignoreInfinity.GetValue(),
+		}
+	} else if actualIgnoreInfinity := actualNotifyAlertTypeData.ignoreInfinity.GetValue(); *in.IgnoreInfinity != actualIgnoreInfinity {
+		return false, utils.Diff{
+			Name:    "IgnoreInfinity",
+			Desired: *in.IgnoreInfinity,
+			Actual:  actualIgnoreInfinity,
+		}
+	}
+
+	return true, utils.Diff{}
+}
+
 type Recipients struct {
 	// +optional
-	Emails []Email `json:"emails,omitempty"`
+	Emails []string `json:"emails,omitempty"`
 
 	// +optional
 	Webhooks []string `json:"webhooks,omitempty"`
 }
-
-/* +kubebuilder:validation:Pattern=^[a-z/d._%+\-]+@[a-z/d.\-]+\.[a-z]{2,4}$*/
-type Email string
 
 type Scheduling struct {
 	//+kubebuilder:default=UTC+0
@@ -544,11 +721,110 @@ type AlertType struct {
 	Flow *Flow `json:"flow,omitempty"`
 }
 
+func (in *AlertType) DeepEqual(actualAlert *alerts.Alert, notifyData *notificationsAlertTypeData) (bool, utils.Diff) {
+	actualFilters := actualAlert.GetFilters()
+	actualCondition := actualAlert.GetCondition()
+
+	switch actualFilters.GetFilterType() {
+	case alerts.AlertFilters_FILTER_TYPE_TEXT_OR_UNSPECIFIED:
+		if newValueCondition, ok := actualCondition.GetCondition().(*alerts.AlertCondition_NewValue); ok {
+			if in.NewValue == nil {
+				return false, utils.Diff{
+					Name:   "Type",
+					Actual: "NewValue",
+				}
+			} else if equal, diff := in.NewValue.DeepEqual(actualFilters, newValueCondition, notifyData); !equal {
+				return false, utils.Diff{
+					Name:    fmt.Sprintf("NewValue.%s", diff.Name),
+					Desired: diff.Desired,
+					Actual:  diff.Actual,
+				}
+			}
+		} else {
+			if in.Standard == nil {
+				return false, utils.Diff{
+					Name:   "Type",
+					Actual: "Standard",
+				}
+			} else if equal, diff := in.Standard.DeepEqual(actualFilters, actualAlert.GetCondition(), notifyData); !equal {
+				return false, utils.Diff{
+					Name:    fmt.Sprintf("Standard.%s", diff.Name),
+					Desired: diff.Desired,
+					Actual:  diff.Actual,
+				}
+			}
+		}
+	case alerts.AlertFilters_FILTER_TYPE_RATIO:
+		//alertType = "ratio"
+		//alertSchema, ignoreInfinity, notifyWhenResolved, notifyOnlyOnTriggeredGroupByValues = flattenRatioAlert(filters, actualCondition)
+		return true, utils.Diff{}
+	case alerts.AlertFilters_FILTER_TYPE_UNIQUE_COUNT:
+		//alertType = "unique_count"
+		//alertSchema = flattenUniqueCountAlert(filters, actualCondition)
+		return true, utils.Diff{}
+	case alerts.AlertFilters_FILTER_TYPE_TIME_RELATIVE:
+		//alertType = "time_relative"
+		//alertSchema, ignoreInfinity, notifyWhenResolved, notifyOnlyOnTriggeredGroupByValues = flattenTimeRelativeAlert(filters, actualCondition)
+		return true, utils.Diff{}
+	case alerts.AlertFilters_FILTER_TYPE_METRIC:
+		//alertType = "metric"
+		//alertSchema, notifyWhenResolved, notifyOnlyOnTriggeredGroupByValues = flattenMetricAlert(filters, actualCondition)
+		return true, utils.Diff{}
+	case alerts.AlertFilters_FILTER_TYPE_TRACING:
+		//alertType = "tracing"
+		//alertSchema, notifyWhenResolved = flattenTracingAlert(actualCondition, a.TracingAlert)
+		return true, utils.Diff{}
+	case alerts.AlertFilters_FILTER_TYPE_FLOW:
+		return true, utils.Diff{}
+	}
+
+	return true, utils.Diff{}
+}
+
 type Standard struct {
 	// +optional
 	Filters *Filters `json:"filters,omitempty"`
 
 	Conditions StandardConditions `json:"conditions,omitempty"`
+}
+
+func (in *Standard) DeepEqual(filters *alerts.AlertFilters, condition *alerts.AlertCondition, data *notificationsAlertTypeData) (bool, utils.Diff) {
+	if equal, diff := in.Conditions.DeepEqual(condition, data); !equal {
+		return false, utils.Diff{
+			Name:    fmt.Sprintf("Conditions.%s", diff.Name),
+			Desired: diff.Desired,
+			Actual:  diff.Actual,
+		}
+	}
+
+	if equal, diff := in.Filters.DeepEqual(filters); !equal {
+		return false, utils.Diff{
+			Name:    fmt.Sprintf("Filter.%s", diff.Name),
+			Desired: diff.Desired,
+			Actual:  diff.Actual,
+		}
+	}
+
+	return true, utils.Diff{}
+}
+
+func equalSeverities(severities []FiltersLogSeverity, actualSeverities []alerts.AlertFilters_LogSeverity) bool {
+	if len(severities) != len(actualSeverities) {
+		return false
+	}
+
+	valuesSet := make(map[alerts.AlertFilters_LogSeverity]bool, len(severities))
+	for _, _a := range actualSeverities {
+		valuesSet[_a] = true
+	}
+
+	for _, _b := range severities {
+		if !valuesSet[alertSchemaFiltersLogSeverityToProtoFiltersLogSeverity[_b]] {
+			return false
+		}
+	}
+
+	return true
 }
 
 type Ratio struct {
@@ -564,6 +840,10 @@ type NewValue struct {
 	Filters *Filters `json:"filters,omitempty"`
 
 	Conditions NewValueConditions `json:"conditions,omitempty"`
+}
+
+func (in *NewValue) DeepEqual(filters *alerts.AlertFilters, condition *alerts.AlertCondition_NewValue, data *notificationsAlertTypeData) (bool, utils.Diff) {
+	return true, utils.Diff{}
 }
 
 type UniqueCount struct {
@@ -627,6 +907,65 @@ type StandardConditions struct {
 
 	// +optional
 	ManageUndetectedValues *ManageUndetectedValues `json:"manageUndetectedValues,omitempty"`
+}
+
+func (in *StandardConditions) DeepEqual(condition *alerts.AlertCondition, data *notificationsAlertTypeData) (bool, utils.Diff) {
+	switch condition.GetCondition().(type) {
+	case *alerts.AlertCondition_LessThan:
+		lessThanParams := condition.GetLessThan().GetParameters()
+		if alertWhen := in.AlertWhen; alertWhen != "Less" {
+			return false, utils.Diff{
+				Name:    "AlertWhen",
+				Desired: alertWhen,
+				Actual:  "Less",
+			}
+		}
+		if threshold, actualThreshold := float64(*(in.Threshold)), lessThanParams.GetThreshold().GetValue(); threshold != actualThreshold {
+			return false, utils.Diff{
+				Name:    "Threshold",
+				Desired: threshold,
+				Actual:  actualThreshold,
+			}
+		}
+		if timeWindow, actualTimeWindow := alertSchemaTimeWindowToProtoTimeWindow[string(*in.TimeWindow)], lessThanParams.GetTimeframe(); timeWindow != actualTimeWindow {
+			return false, utils.Diff{
+				Name:    "TimeWindow",
+				Desired: timeWindow,
+				Actual:  actualTimeWindow,
+			}
+		}
+		if groupBy, actualGroupBy := in.GroupBy, utils.WrappedStringSliceToStringSlice(lessThanParams.GetGroupBy()); !utils.SlicesWithUniqueValuesEqual(groupBy, actualGroupBy) {
+			return false, utils.Diff{
+				Name:    "GroupBy",
+				Desired: groupBy,
+				Actual:  actualGroupBy,
+			}
+		}
+		if manageUndetectedValues, actualManageUndetectedValues := in.ManageUndetectedValues, lessThanParams.GetRelatedExtendedData(); manageUndetectedValues == nil && actualManageUndetectedValues != nil {
+			return false, utils.Diff{
+				Name:    "ManageUndetectedValues",
+				Desired: manageUndetectedValues,
+				Actual:  *actualManageUndetectedValues,
+			}
+		} else if equal, diff := manageUndetectedValues.DeepEqual(actualManageUndetectedValues); !equal {
+			return false, utils.Diff{
+				Name:    fmt.Sprintf("ManageUndetectedValues,%s", diff.Name),
+				Desired: diff.Desired,
+				Actual:  diff.Actual,
+			}
+		}
+
+		data.notifyOnlyOnTriggeredGroupByValues = lessThanParams.NotifyGroupByOnlyAlerts
+		data.onTriggerAndResolved = lessThanParams.NotifyOnResolved
+		data.ignoreInfinity = lessThanParams.IgnoreInfinity
+
+		return true, utils.Diff{}
+	case *alerts.AlertCondition_MoreThan:
+	case *alerts.AlertCondition_MoreThanUsual:
+	case *alerts.AlertCondition_Immediate:
+
+	}
+	return false, utils.Diff{}
 }
 
 type RatioConditions struct {
@@ -808,6 +1147,90 @@ type Filters struct {
 	IPs []string `json:"ips,omitempty"`
 }
 
+func (in *Filters) DeepEqual(filters *alerts.AlertFilters) (bool, utils.Diff) {
+	if searchQuery, actualSearchQuery := in.SearchQuery, filters.GetText(); searchQuery == nil && actualSearchQuery != nil {
+		return false, utils.Diff{
+			Name:    "SearchQuery",
+			Desired: searchQuery,
+			Actual:  *actualSearchQuery,
+		}
+	} else if searchQuery, actualSearchQuery := *searchQuery, actualSearchQuery.GetValue(); searchQuery != actualSearchQuery {
+		return false, utils.Diff{
+			Name:    "SearchQuery",
+			Desired: searchQuery,
+			Actual:  actualSearchQuery,
+		}
+	}
+
+	if severities, actualSeverities := in.Severities, filters.Severities; !equalSeverities(severities, actualSeverities) {
+		return false, utils.Diff{
+			Name:    "Severities",
+			Desired: severities,
+			Actual:  actualSeverities,
+		}
+	}
+
+	metadata := filters.Metadata
+
+	if applications, actualApplications := in.Applications, utils.WrappedStringSliceToStringSlice(metadata.Applications); !utils.SlicesWithUniqueValuesEqual(applications, actualApplications) {
+		return false, utils.Diff{
+			Name:    "Application",
+			Desired: applications,
+			Actual:  actualApplications,
+		}
+	}
+
+	if subsystems, actualSubsystems := in.Subsystems, utils.WrappedStringSliceToStringSlice(metadata.Subsystems); !utils.SlicesWithUniqueValuesEqual(subsystems, actualSubsystems) {
+		return false, utils.Diff{
+			Name:    "Subsystems",
+			Desired: subsystems,
+			Actual:  actualSubsystems,
+		}
+	}
+
+	if categories, actualCategories := in.Categories, utils.WrappedStringSliceToStringSlice(metadata.Categories); !utils.SlicesWithUniqueValuesEqual(categories, actualCategories) {
+		return false, utils.Diff{
+			Name:    "Categories",
+			Desired: categories,
+			Actual:  actualCategories,
+		}
+	}
+
+	if computers, actualComputers := in.Computers, utils.WrappedStringSliceToStringSlice(metadata.Computers); !utils.SlicesWithUniqueValuesEqual(computers, actualComputers) {
+		return false, utils.Diff{
+			Name:    "Computers",
+			Desired: computers,
+			Actual:  actualComputers,
+		}
+	}
+
+	if classes, actualClasses := in.Classes, utils.WrappedStringSliceToStringSlice(metadata.Classes); !utils.SlicesWithUniqueValuesEqual(classes, actualClasses) {
+		return false, utils.Diff{
+			Name:    "Classes",
+			Desired: classes,
+			Actual:  actualClasses,
+		}
+	}
+
+	if methods, actualMethods := in.Methods, utils.WrappedStringSliceToStringSlice(metadata.Methods); !utils.SlicesWithUniqueValuesEqual(methods, actualMethods) {
+		return false, utils.Diff{
+			Name:    "Methods",
+			Desired: methods,
+			Actual:  actualMethods,
+		}
+	}
+
+	if IPs, actualIPs := in.IPs, utils.WrappedStringSliceToStringSlice(metadata.IpAddresses); !utils.SlicesWithUniqueValuesEqual(IPs, actualIPs) {
+		return false, utils.Diff{
+			Name:    "IPs",
+			Desired: IPs,
+			Actual:  actualIPs,
+		}
+	}
+
+	return true, utils.Diff{}
+}
+
 // +kubebuilder:validation:Enum=Debug;Verbose;Info;Warning;Critical;Error;
 type FiltersLogSeverity string
 
@@ -840,8 +1263,30 @@ type FilterOperator string
 type FieldFilterValue string
 
 type ManageUndetectedValues struct {
-	EnableTriggeringOnUndetectedValues bool             `json:"enableTriggeringOnUndetectedValues,omitempty"`
-	AutoRetireRatio                    *AutoRetireRatio `json:"autoRetireRatio,omitempty"`
+	//+kubebuilder:default=true
+	EnableTriggeringOnUndetectedValues bool `json:"enableTriggeringOnUndetectedValues,omitempty"`
+
+	//+kubebuilder:default=Never
+	AutoRetireRatio *AutoRetireRatio `json:"autoRetireRatio,omitempty"`
+}
+
+func (in *ManageUndetectedValues) DeepEqual(manageUndetectedValues *alerts.RelatedExtendedData) (bool, utils.Diff) {
+	if enableTriggeringOnUndetectedValues, actualEnableTriggeringOnUndetectedValues := in.EnableTriggeringOnUndetectedValues, manageUndetectedValues.GetShouldTriggerDeadman().GetValue(); enableTriggeringOnUndetectedValues != actualEnableTriggeringOnUndetectedValues {
+		return false, utils.Diff{
+			Name:    "EnableTriggeringOnUndetectedValues",
+			Desired: enableTriggeringOnUndetectedValues,
+			Actual:  actualEnableTriggeringOnUndetectedValues,
+		}
+	}
+	if autoRetireRatio, actualAutoRetireRatio := alertSchemaAutoRetireRatioToProtoAutoRetireRatio[*in.AutoRetireRatio], manageUndetectedValues.GetCleanupDeadmanDuration(); autoRetireRatio != actualAutoRetireRatio {
+		return false, utils.Diff{
+			Name:    "AutoRetireRatio",
+			Desired: autoRetireRatio,
+			Actual:  actualAutoRetireRatio,
+		}
+	}
+
+	return true, utils.Diff{}
 }
 
 type FlowStage struct {

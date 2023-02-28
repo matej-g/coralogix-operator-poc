@@ -108,6 +108,12 @@ func (r *AlertReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 			if _, err := alertsClient.DeleteAlert(ctx, deleteAlertReq); err != nil {
 				// if fail to delete the external dependency here, return with error
 				// so that it can be retried
+				if status.Code(err) == codes.NotFound {
+					controllerutil.RemoveFinalizer(alertCRD, myFinalizerName)
+					err := r.Update(ctx, alertCRD)
+					return ctrl.Result{}, err
+				}
+
 				log.Error(err, "Received an error while Deleting a Alert", "Alert ID", alertId)
 				return ctrl.Result{}, err
 			}

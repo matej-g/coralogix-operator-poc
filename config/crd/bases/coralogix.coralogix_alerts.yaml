@@ -99,6 +99,7 @@ spec:
                               manageUndetectedValues:
                                 properties:
                                   autoRetireRatio:
+                                    default: Never
                                     enum:
                                     - Never
                                     - FiveMinutes
@@ -110,6 +111,7 @@ spec:
                                     - TwentyFourHours
                                     type: string
                                   enableTriggeringOnUndetectedValues:
+                                    default: true
                                     type: boolean
                                 type: object
                               metricField:
@@ -165,6 +167,7 @@ spec:
                               manageUndetectedValues:
                                 properties:
                                   autoRetireRatio:
+                                    default: Never
                                     enum:
                                     - Never
                                     - FiveMinutes
@@ -176,6 +179,7 @@ spec:
                                     - TwentyFourHours
                                     type: string
                                   enableTriggeringOnUndetectedValues:
+                                    default: true
                                     type: boolean
                                 type: object
                               minNonNullValuesPercentage:
@@ -425,6 +429,7 @@ spec:
                           manageUndetectedValues:
                             properties:
                               autoRetireRatio:
+                                default: Never
                                 enum:
                                 - Never
                                 - FiveMinutes
@@ -436,6 +441,7 @@ spec:
                                 - TwentyFourHours
                                 type: string
                               enableTriggeringOnUndetectedValues:
+                                default: true
                                 type: boolean
                             type: object
                           threshold:
@@ -517,6 +523,7 @@ spec:
                           manageUndetectedValues:
                             properties:
                               autoRetireRatio:
+                                default: Never
                                 enum:
                                 - Never
                                 - FiveMinutes
@@ -528,6 +535,7 @@ spec:
                                 - TwentyFourHours
                                 type: string
                               enableTriggeringOnUndetectedValues:
+                                default: true
                                 type: boolean
                             type: object
                           threshold:
@@ -795,7 +803,6 @@ spec:
                     properties:
                       emails:
                         items:
-                          description: +kubebuilder:validation:Pattern=^[a-z/d._%+\-]+@[a-z/d.\-]+\.[a-z]{2,4}$
                           type: string
                         type: array
                       webhooks:

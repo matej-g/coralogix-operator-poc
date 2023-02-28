@@ -49,3 +49,11 @@ func StringSliceToWrappedStringSlice(arr []string) []*wrapperspb.StringValue {
 	}
 	return result
 }
+
+func WrappedStringSliceToStringSlice(arr []*wrapperspb.StringValue) []string {
+	result := make([]string, 0, len(arr))
+	for _, s := range arr {
+		result = append(result, s.Value)
+	}
+	return result
+}

@@ -757,7 +757,7 @@ func (in *Recipients) DeepCopyInto(out *Recipients) {
 	*out = *in
 	if in.Emails != nil {
 		in, out := &in.Emails, &out.Emails
-		*out = make([]Email, len(*in))
+		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
 	if in.Webhooks != nil {

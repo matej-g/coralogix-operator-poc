@@ -97,8 +97,8 @@ type Rule struct {
 	ParseJsonField *ParseJsonField `json:"parseJsonField,omitempty"`
 }
 
-func (in *Rule) DeepEqual(rule *rulesgroups.Rule) (bool, utils.Diff) {
-	if actualActive := rule.Enabled.GetValue(); in.Active != actualActive {
+func (in *Rule) DeepEqual(actualRule *rulesgroups.Rule) (bool, utils.Diff) {
+	if actualActive := actualRule.Enabled.GetValue(); in.Active != actualActive {
 		return false, utils.Diff{
 			Name:    "Active",
 			Desired: in.Active,
@@ -106,7 +106,7 @@ func (in *Rule) DeepEqual(rule *rulesgroups.Rule) (bool, utils.Diff) {
 		}
 	}
 
-	if actualDescription := rule.Description.GetValue(); in.Description != actualDescription {
+	if actualDescription := actualRule.Description.GetValue(); in.Description != actualDescription {
 		return false, utils.Diff{
 			Name:    "Description",
 			Desired: in.Description,
@@ -114,7 +114,7 @@ func (in *Rule) DeepEqual(rule *rulesgroups.Rule) (bool, utils.Diff) {
 		}
 	}
 
-	if actualName := rule.Name.GetValue(); in.Name != actualName {
+	if actualName := actualRule.Name.GetValue(); in.Name != actualName {
 		return false, utils.Diff{
 			Name:    "Name",
 			Desired: in.Name,
@@ -122,7 +122,7 @@ func (in *Rule) DeepEqual(rule *rulesgroups.Rule) (bool, utils.Diff) {
 		}
 	}
 
-	return in.DeepEqualRuleType(rule)
+	return in.DeepEqualRuleType(actualRule)
 }
 
 func (in *Rule) DeepEqualRuleType(parameters *rulesgroups.Rule) (bool, utils.Diff) {
@@ -529,8 +529,8 @@ type RuleSubGroup struct {
 	Rules []Rule `json:"rules,omitempty"`
 }
 
-func (in *RuleSubGroup) DeepEqual(subgroup *rulesgroups.RuleSubgroup) (bool, utils.Diff) {
-	if actualActive := subgroup.Enabled.GetValue(); in.Active != actualActive {
+func (in *RuleSubGroup) DeepEqual(actualSubgroup *rulesgroups.RuleSubgroup) (bool, utils.Diff) {
+	if actualActive := actualSubgroup.Enabled.GetValue(); in.Active != actualActive {
 		return false, utils.Diff{
 			Name:    "Active",
 			Desired: in.Active,
@@ -538,16 +538,16 @@ func (in *RuleSubGroup) DeepEqual(subgroup *rulesgroups.RuleSubgroup) (bool, uti
 		}
 	}
 
-	if len(in.Rules) != len(subgroup.Rules) {
+	if len(in.Rules) != len(actualSubgroup.Rules) {
 		return false, utils.Diff{
 			Name:    "Rules.length",
 			Desired: len(in.Rules),
-			Actual:  len(subgroup.Rules),
+			Actual:  len(actualSubgroup.Rules),
 		}
 	}
 
 	for i := range in.Rules {
-		if equal, diff := in.Rules[i].DeepEqual(subgroup.Rules[i]); !equal {
+		if equal, diff := in.Rules[i].DeepEqual(actualSubgroup.Rules[i]); !equal {
 			return false, utils.Diff{
 				Name:    fmt.Sprintf("Rules[%d].%s", i, diff.Name),
 				Desired: diff.Desired,
@@ -601,8 +601,8 @@ func (in *RuleGroupSpec) ToString() string {
 	return string(str)
 }
 
-func (in *RuleGroupSpec) DeepEqual(actualState *rulesgroups.RuleGroup) (bool, utils.Diff) {
-	if actualName := actualState.GetName().GetValue(); in.Name != actualName {
+func (in *RuleGroupSpec) DeepEqual(actualRuleGroup *rulesgroups.RuleGroup) (bool, utils.Diff) {
+	if actualName := actualRuleGroup.GetName().GetValue(); in.Name != actualName {
 		return false, utils.Diff{
 			Name:    "Name",
 			Desired: in.Name,
@@ -610,7 +610,7 @@ func (in *RuleGroupSpec) DeepEqual(actualState *rulesgroups.RuleGroup) (bool, ut
 		}
 	}
 
-	if actualDescription := actualState.GetDescription().GetValue(); in.Description != actualDescription {
+	if actualDescription := actualRuleGroup.GetDescription().GetValue(); in.Description != actualDescription {
 		return false, utils.Diff{
 			Name:    "Description",
 			Desired: in.Description,
@@ -618,7 +618,7 @@ func (in *RuleGroupSpec) DeepEqual(actualState *rulesgroups.RuleGroup) (bool, ut
 		}
 	}
 
-	if actualActive := actualState.GetEnabled().GetValue(); in.Active != actualActive {
+	if actualActive := actualRuleGroup.GetEnabled().GetValue(); in.Active != actualActive {
 		return false, utils.Diff{
 			Name:    "Active",
 			Desired: in.Active,
@@ -626,7 +626,7 @@ func (in *RuleGroupSpec) DeepEqual(actualState *rulesgroups.RuleGroup) (bool, ut
 		}
 	}
 
-	if actualHidden := actualState.GetHidden().GetValue(); in.Hidden != actualHidden {
+	if actualHidden := actualRuleGroup.GetHidden().GetValue(); in.Hidden != actualHidden {
 		return false, utils.Diff{
 			Name:    "Hidden",
 			Desired: in.Hidden,
@@ -634,7 +634,7 @@ func (in *RuleGroupSpec) DeepEqual(actualState *rulesgroups.RuleGroup) (bool, ut
 		}
 	}
 
-	if actualCreator := actualState.GetCreator().GetValue(); in.Creator != actualCreator {
+	if actualCreator := actualRuleGroup.GetCreator().GetValue(); in.Creator != actualCreator {
 		return false, utils.Diff{
 			Name:    "Creator",
 			Desired: in.Creator,
@@ -644,8 +644,8 @@ func (in *RuleGroupSpec) DeepEqual(actualState *rulesgroups.RuleGroup) (bool, ut
 
 	if in.Order == nil {
 		in.Order = new(int32)
-		*in.Order = int32(actualState.GetOrder().GetValue())
-	} else if actualOrder := actualState.GetOrder().GetValue(); uint32(*in.Order) != actualOrder {
+		*in.Order = int32(actualRuleGroup.GetOrder().GetValue())
+	} else if actualOrder := actualRuleGroup.GetOrder().GetValue(); uint32(*in.Order) != actualOrder {
 		return false, utils.Diff{
 			Name:    "Order",
 			Desired: *in.Order,
@@ -653,7 +653,7 @@ func (in *RuleGroupSpec) DeepEqual(actualState *rulesgroups.RuleGroup) (bool, ut
 		}
 	}
 
-	applications, subsystems, severities := flattenRuleMatchers(actualState.RuleMatchers)
+	applications, subsystems, severities := flattenRuleMatchers(actualRuleGroup.RuleMatchers)
 
 	if !utils.SlicesWithUniqueValuesEqual(in.Applications, applications) {
 		return false, utils.Diff{
@@ -679,16 +679,16 @@ func (in *RuleGroupSpec) DeepEqual(actualState *rulesgroups.RuleGroup) (bool, ut
 		}
 	}
 
-	if len(in.RuleSubgroups) != len(actualState.RuleSubgroups) {
+	if len(in.RuleSubgroups) != len(actualRuleGroup.RuleSubgroups) {
 		return false, utils.Diff{
 			Name:    "RuleSubgroups length",
 			Desired: len(in.RuleSubgroups),
-			Actual:  len(actualState.RuleSubgroups),
+			Actual:  len(actualRuleGroup.RuleSubgroups),
 		}
 	}
 
 	for i := range in.RuleSubgroups {
-		if equal, diff := in.RuleSubgroups[i].DeepEqual(actualState.RuleSubgroups[i]); !equal {
+		if equal, diff := in.RuleSubgroups[i].DeepEqual(actualRuleGroup.RuleSubgroups[i]); !equal {
 			return false, utils.Diff{
 				Name:    fmt.Sprintf("RuleSubgroups[%d].%s", i, diff.Name),
 				Desired: diff.Desired,
