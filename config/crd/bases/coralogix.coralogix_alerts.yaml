@@ -89,6 +89,13 @@ spec:
                                 - Less
                                 type: string
                               arithmeticOperator:
+                                enum:
+                                - Avg
+                                - Min
+                                - Max
+                                - Sum
+                                - Count
+                                - Percentile
                                 type: string
                               arithmeticOperatorModifier:
                                 type: integer
@@ -121,6 +128,7 @@ spec:
                                 multipleOf: 10
                                 type: integer
                               replaceMissingValueWithZero:
+                                default: false
                                 type: boolean
                               sampleThresholdPercentage:
                                 minimum: 0
@@ -238,6 +246,8 @@ spec:
                         type: object
                       filters:
                         properties:
+                          alias:
+                            type: string
                           applications:
                             items:
                               type: string
@@ -300,6 +310,24 @@ spec:
                             - Q2
                             - Both
                             type: string
+                          manageUndetectedValues:
+                            properties:
+                              autoRetireRatio:
+                                default: Never
+                                enum:
+                                - Never
+                                - FiveMinutes
+                                - TenMinutes
+                                - Hour
+                                - TwoHours
+                                - SixHours
+                                - TwelveHours
+                                - TwentyFourHours
+                                type: string
+                              enableTriggeringOnUndetectedValues:
+                                default: true
+                                type: boolean
+                            type: object
                           ratio:
                             anyOf:
                             - type: integer
@@ -324,6 +352,8 @@ spec:
                         type: object
                       q1Filters:
                         properties:
+                          alias:
+                            type: string
                           applications:
                             items:
                               type: string
@@ -368,27 +398,9 @@ spec:
                         type: object
                       q2Filters:
                         properties:
+                          alias:
+                            type: string
                           applications:
-                            items:
-                              type: string
-                            type: array
-                          categories:
-                            items:
-                              type: string
-                            type: array
-                          classes:
-                            items:
-                              type: string
-                            type: array
-                          computers:
-                            items:
-                              type: string
-                            type: array
-                          ips:
-                            items:
-                              type: string
-                            type: array
-                          methods:
                             items:
                               type: string
                             type: array
@@ -464,6 +476,8 @@ spec:
                         type: object
                       filters:
                         properties:
+                          alias:
+                            type: string
                           applications:
                             items:
                               type: string
@@ -556,6 +570,8 @@ spec:
                         type: object
                       filters:
                         properties:
+                          alias:
+                            type: string
                           applications:
                             items:
                               type: string
@@ -713,6 +729,8 @@ spec:
                         type: object
                       filters:
                         properties:
+                          alias:
+                            type: string
                           applications:
                             items:
                               type: string
