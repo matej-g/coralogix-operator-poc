@@ -675,6 +675,7 @@ spec:
                               type: object
                             type: array
                           latencyThresholdMS:
+                            default: true
                             type: integer
                           tagFilters:
                             items:

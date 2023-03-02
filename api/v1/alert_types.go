@@ -804,11 +804,31 @@ func (in *AlertType) DeepEqual(actualAlert *alerts.Alert, notifyData *notificati
 			}
 		}
 	case alerts.AlertFilters_FILTER_TYPE_TRACING:
-		//alertType = "tracing"
-		//alertSchema, notifyWhenResolved = flattenTracingAlert(actualCondition, a.TracingAlert)
-		return true, utils.Diff{}
+		if tracing := in.Tracing; tracing == nil {
+			return false, utils.Diff{
+				Name:   "Type",
+				Actual: "TimeRelative",
+			}
+		} else if equal, diff := tracing.DeepEqual(actualAlert.GetTracingAlert(), actualAlert.GetCondition(), notifyData); !equal {
+			return false, utils.Diff{
+				Name:    fmt.Sprintf("TimeRelative.%s", diff.Name),
+				Desired: diff.Desired,
+				Actual:  diff.Actual,
+			}
+		}
 	case alerts.AlertFilters_FILTER_TYPE_FLOW:
-		return true, utils.Diff{}
+		if flow := in.Flow; flow == nil {
+			return false, utils.Diff{
+				Name:   "Type",
+				Actual: "Flow",
+			}
+		} else if equal, diff := flow.DeepEqual(actualAlert.GetCondition().GetFlow()); !equal {
+			return false, utils.Diff{
+				Name:    fmt.Sprintf("Flow.%s", diff.Name),
+				Desired: diff.Desired,
+				Actual:  diff.Actual,
+			}
+		}
 	}
 
 	return true, utils.Diff{}
@@ -832,7 +852,7 @@ func (in *Standard) DeepEqual(filters *alerts.AlertFilters, condition *alerts.Al
 
 	if equal, diff := in.Filters.DeepEqual(filters); !equal {
 		return false, utils.Diff{
-			Name:    fmt.Sprintf("Filter.%s", diff.Name),
+			Name:    fmt.Sprintf("Filters.%s", diff.Name),
 			Desired: diff.Desired,
 			Actual:  diff.Actual,
 		}
@@ -932,7 +952,7 @@ func (in *NewValue) DeepEqual(filters *alerts.AlertFilters, condition *alerts.Al
 
 	if equal, diff := in.Filters.DeepEqual(filters); !equal {
 		return false, utils.Diff{
-			Name:    fmt.Sprintf("Filter.%s", diff.Name),
+			Name:    fmt.Sprintf("Filters.%s", diff.Name),
 			Desired: diff.Desired,
 			Actual:  diff.Actual,
 		}
@@ -959,7 +979,7 @@ func (in *UniqueCount) DeepEqual(filters *alerts.AlertFilters, condition *alerts
 
 	if equal, diff := in.Filters.DeepEqual(filters); !equal {
 		return false, utils.Diff{
-			Name:    fmt.Sprintf("Filter.%s", diff.Name),
+			Name:    fmt.Sprintf("Filters.%s", diff.Name),
 			Desired: diff.Desired,
 			Actual:  diff.Actual,
 		}
@@ -985,7 +1005,7 @@ func (in *TimeRelative) DeepEqual(filters *alerts.AlertFilters, condition *alert
 	}
 	if equal, diff := in.Filters.DeepEqual(filters); !equal {
 		return false, utils.Diff{
-			Name:    fmt.Sprintf("Filter.%s", diff.Name),
+			Name:    fmt.Sprintf("Filters.%s", diff.Name),
 			Desired: diff.Desired,
 			Actual:  diff.Actual,
 		}
@@ -1016,7 +1036,7 @@ type Lucene struct {
 	// +optional
 	SearchQuery *string `json:"searchQuery,omitempty"`
 
-	LuceneConditions LuceneConditions `json:"conditions,omitempty"`
+	Conditions LuceneConditions `json:"conditions,omitempty"`
 }
 
 func (in *Lucene) DeepEqual(filters *alerts.AlertFilters, condition *alerts.AlertCondition, data *notificationsAlertTypeData) (bool, utils.Diff) {
@@ -1039,7 +1059,7 @@ func (in *Lucene) DeepEqual(filters *alerts.AlertFilters, condition *alerts.Aler
 		}
 	}
 
-	if alertWhen := string(in.LuceneConditions.AlertWhen); actualAlertWhen != alertWhen {
+	if alertWhen := string(in.Conditions.AlertWhen); actualAlertWhen != alertWhen {
 		return false, utils.Diff{
 			Name:    "Lucene.Conditions.AlertWhen",
 			Desired: alertWhen,
@@ -1061,7 +1081,7 @@ func (in *Lucene) DeepEqual(filters *alerts.AlertFilters, condition *alerts.Aler
 		}
 	}
 
-	if equal, diff := in.LuceneConditions.DeepEqual(conditionParams, data); !equal {
+	if equal, diff := in.Conditions.DeepEqual(conditionParams, data); !equal {
 		return false, utils.Diff{
 			Name:    fmt.Sprintf("Lucene.Conditions.%s", diff.Name),
 			Desired: diff.Desired,
@@ -1076,22 +1096,94 @@ type Promql struct {
 	// +optional
 	SearchQuery *string `json:"searchQuery,omitempty"`
 
-	PromqlConditions PromqlConditions `json:"conditions,omitempty"`
+	Conditions PromqlConditions `json:"conditions,omitempty"`
 }
 
 func (in *Promql) DeepEqual(filters *alerts.AlertFilters, condition *alerts.AlertCondition, data *notificationsAlertTypeData) (bool, utils.Diff) {
+	var conditionParams *alerts.ConditionParameters
+	var actualAlertWhen string
+	switch condition := condition.GetCondition().(type) {
+	case *alerts.AlertCondition_LessThan:
+		actualAlertWhen = "Less"
+		conditionParams = condition.LessThan.GetParameters()
+	case *alerts.AlertCondition_MoreThan:
+		conditionParams = condition.MoreThan.GetParameters()
+		actualAlertWhen = "More"
+	}
+
+	promqlParams := conditionParams.GetMetricAlertPromqlParameters()
+	if promqlParams == nil {
+		return false, utils.Diff{
+			Name:    "Type",
+			Desired: "Promql",
+			Actual:  "Lucene",
+		}
+	}
+
+	if alertWhen := string(in.Conditions.AlertWhen); actualAlertWhen != alertWhen {
+		return false, utils.Diff{
+			Name:    "Promql.Conditions.AlertWhen",
+			Desired: alertWhen,
+			Actual:  actualAlertWhen,
+		}
+	}
+
+	if searchQuery, actualSearchQuery := in.SearchQuery, filters.GetText(); searchQuery == nil && actualSearchQuery != nil {
+		return false, utils.Diff{
+			Name:    "Lucene.SearchQuery",
+			Desired: searchQuery,
+			Actual:  *actualSearchQuery,
+		}
+	} else if searchQuery, actualSearchQuery := *searchQuery, actualSearchQuery.GetValue(); searchQuery != actualSearchQuery {
+		return false, utils.Diff{
+			Name:    "Lucene.SearchQuery",
+			Desired: searchQuery,
+			Actual:  actualSearchQuery,
+		}
+	}
+
+	if equal, diff := in.Conditions.DeepEqual(conditionParams, data); !equal {
+		return false, utils.Diff{
+			Name:    fmt.Sprintf("Promql.Conditions.%s", diff.Name),
+			Desired: diff.Desired,
+			Actual:  diff.Actual,
+		}
+	}
+
 	return true, utils.Diff{}
 }
 
 type Tracing struct {
-	// +optional
-	Filters *TracingFilters `json:"filters,omitempty"`
+	Filters TracingFilters `json:"filters,omitempty"`
 
 	Conditions TracingCondition `json:"conditions,omitempty"`
 }
 
+func (in *Tracing) DeepEqual(filters *alerts.TracingAlert, condition *alerts.AlertCondition, data *notificationsAlertTypeData) (bool, utils.Diff) {
+	if equal, diff := in.Conditions.DeepEqual(condition, data); !equal {
+		return false, utils.Diff{
+			Name:    fmt.Sprintf("Conditions.%s", diff.Name),
+			Desired: diff.Desired,
+			Actual:  diff.Actual,
+		}
+	}
+	if equal, diff := in.Filters.DeepEqual(filters); !equal {
+		return false, utils.Diff{
+			Name:    fmt.Sprintf("Filters.%s", diff.Name),
+			Desired: diff.Desired,
+			Actual:  diff.Actual,
+		}
+	}
+
+	return true, utils.Diff{}
+}
+
 type Flow struct {
 	Stages []FlowStage `json:"stages,omitempty"`
+}
+
+func (in *Flow) DeepEqual(flow *alerts.FlowCondition) (bool, utils.Diff) {
+	return true, utils.Diff{}
 }
 
 type StandardConditions struct {
@@ -1613,6 +1705,23 @@ func (in *LuceneConditions) DeepEqual(conditionParams *alerts.ConditionParameter
 		}
 	}
 
+	if manageUndetectedValues, actualManageUndetectedValues := in.ManageUndetectedValues, conditionParams.GetRelatedExtendedData(); manageUndetectedValues == nil && actualManageUndetectedValues != nil {
+		return false, utils.Diff{
+			Name:    "ManageUndetectedValues",
+			Desired: manageUndetectedValues,
+			Actual:  *actualManageUndetectedValues,
+		}
+	} else if equal, diff := manageUndetectedValues.DeepEqual(actualManageUndetectedValues); !equal {
+		return false, utils.Diff{
+			Name:    fmt.Sprintf("ManageUndetectedValues,%s", diff.Name),
+			Desired: diff.Desired,
+			Actual:  diff.Actual,
+		}
+	}
+
+	data.notifyOnlyOnTriggeredGroupByValues = conditionParams.NotifyPerGroupByValue
+	data.onTriggerAndResolved = conditionParams.NotifyOnResolved
+
 	return true, utils.Diff{}
 }
 
@@ -1635,23 +1744,145 @@ type PromqlConditions struct {
 
 	// +kubebuilder:validation:Minimum:=0
 	// +kubebuilder:validation:MultipleOf:=10
-	MinNonNullValuesPercentage int `json:"minNonNullValuesPercentage,omitempty"`
+	MinNonNullValuesPercentage *int `json:"minNonNullValuesPercentage,omitempty"`
 
 	// +optional
 	ManageUndetectedValues *ManageUndetectedValues `json:"manageUndetectedValues,omitempty"`
+}
+
+func (in *PromqlConditions) DeepEqual(conditionParams *alerts.ConditionParameters, data *notificationsAlertTypeData) (bool, utils.Diff) {
+	if threshold, actualThreshold := in.Threshold.AsApproximateFloat64(), conditionParams.Threshold.GetValue(); threshold != actualThreshold {
+		return false, utils.Diff{
+			Name:    "Threshold",
+			Desired: threshold,
+			Actual:  actualThreshold,
+		}
+	}
+
+	if groupBy, actualGroupBy := in.GroupBy, utils.WrappedStringSliceToStringSlice(conditionParams.GetGroupBy()); !utils.SlicesWithUniqueValuesEqual(groupBy, actualGroupBy) {
+		return false, utils.Diff{
+			Name:    "GroupBy",
+			Desired: groupBy,
+			Actual:  actualGroupBy,
+		}
+	}
+
+	if timeWindow, actualTimeWindow := alertSchemaTimeWindowToProtoTimeWindow[string(in.TimeWindow)], conditionParams.GetTimeframe(); timeWindow != actualTimeWindow {
+		return false, utils.Diff{
+			Name:    "TimeWindow",
+			Desired: timeWindow,
+			Actual:  actualTimeWindow,
+		}
+	}
+
+	metricParams := conditionParams.GetMetricAlertParameters()
+
+	if sampleThresholdPercentage, actualSampleThresholdPercentage := in.SampleThresholdPercentage, int(metricParams.SampleThresholdPercentage.GetValue()); sampleThresholdPercentage != actualSampleThresholdPercentage {
+		return false, utils.Diff{
+			Name:    "SampleThresholdPercentage",
+			Desired: sampleThresholdPercentage,
+			Actual:  actualSampleThresholdPercentage,
+		}
+	}
+
+	if minNonNullValuesPercentage, actualMinNonNullValuesPercentage := in.MinNonNullValuesPercentage, metricParams.GetNonNullPercentage(); minNonNullValuesPercentage == nil && actualMinNonNullValuesPercentage != nil {
+		return false, utils.Diff{
+			Name:    "MinNonNullValuesPercentage",
+			Desired: minNonNullValuesPercentage,
+			Actual:  actualMinNonNullValuesPercentage.GetValue(),
+		}
+	} else if minNonNullValuesPercentage, actualMinNonNullValuesPercentage := *minNonNullValuesPercentage, int(actualMinNonNullValuesPercentage.GetValue()); minNonNullValuesPercentage != actualMinNonNullValuesPercentage {
+		return false, utils.Diff{
+			Name:    "MinNonNullValuesPercentage",
+			Desired: minNonNullValuesPercentage,
+			Actual:  actualMinNonNullValuesPercentage,
+		}
+	}
+
+	if manageUndetectedValues, actualManageUndetectedValues := in.ManageUndetectedValues, conditionParams.GetRelatedExtendedData(); manageUndetectedValues == nil && actualManageUndetectedValues != nil {
+		return false, utils.Diff{
+			Name:    "ManageUndetectedValues",
+			Desired: manageUndetectedValues,
+			Actual:  *actualManageUndetectedValues,
+		}
+	} else if equal, diff := manageUndetectedValues.DeepEqual(actualManageUndetectedValues); !equal {
+		return false, utils.Diff{
+			Name:    fmt.Sprintf("ManageUndetectedValues,%s", diff.Name),
+			Desired: diff.Desired,
+			Actual:  diff.Actual,
+		}
+	}
+
+	data.notifyOnlyOnTriggeredGroupByValues = conditionParams.NotifyPerGroupByValue
+	data.onTriggerAndResolved = conditionParams.NotifyOnResolved
+
+	return true, utils.Diff{}
 }
 
 type TracingCondition struct {
 	AlertWhen TracingAlertWhen `json:"alertWhen,omitempty"`
 
 	// +optional
-	Threshold resource.Quantity `json:"threshold,omitempty"`
+	Threshold *resource.Quantity `json:"threshold,omitempty"`
 
 	// +optional
-	TimeWindow TimeWindow `json:"timeWindow,omitempty"`
+	TimeWindow *TimeWindow `json:"timeWindow,omitempty"`
 
 	// +optional
 	GroupBy []string `json:"groupBy,omitempty"`
+}
+
+func (in *TracingCondition) DeepEqual(condition *alerts.AlertCondition, data *notificationsAlertTypeData) (bool, utils.Diff) {
+	var conditionParams *alerts.ConditionParameters
+	switch condition := condition.GetCondition().(type) {
+	case *alerts.AlertCondition_MoreThan:
+		if alertWhen, actualAlertWhen := in.AlertWhen, "More"; string(alertWhen) != actualAlertWhen {
+			return false, utils.Diff{
+				Name:    "AlertWhen",
+				Desired: alertWhen,
+				Actual:  actualAlertWhen,
+			}
+		}
+		conditionParams = condition.MoreThan.GetParameters()
+		if threshold, actualThreshold := in.Threshold.AsApproximateFloat64(), conditionParams.GetThreshold().GetValue(); threshold != actualThreshold {
+			return false, utils.Diff{
+				Name:    "Threshold",
+				Desired: threshold,
+				Actual:  actualThreshold,
+			}
+		}
+		if timeWindow, actualTimeWindow := in.TimeWindow, conditionParams.GetTimeframe(); timeWindow == nil {
+			return false, utils.Diff{
+				Name:    "TimeWindow",
+				Desired: timeWindow,
+				Actual:  actualTimeWindow,
+			}
+		} else if timeWindow := alertSchemaTimeWindowToProtoTimeWindow[string(*timeWindow)]; timeWindow != actualTimeWindow {
+			return false, utils.Diff{
+				Name:    "TimeWindow",
+				Desired: timeWindow,
+				Actual:  actualTimeWindow,
+			}
+		}
+		if groupBy, actualGroupBy := in.GroupBy, utils.WrappedStringSliceToStringSlice(conditionParams.GetGroupBy()); !utils.SlicesWithUniqueValuesEqual(groupBy, actualGroupBy) {
+			return false, utils.Diff{
+				Name:    "GroupBy",
+				Desired: groupBy,
+				Actual:  actualGroupBy,
+			}
+		}
+		data.onTriggerAndResolved = conditionParams.GetNotifyOnResolved()
+	case *alerts.AlertCondition_Immediate:
+		if alertWhen, actualAlertWhen := in.AlertWhen, "Immediately"; string(alertWhen) != actualAlertWhen {
+			return false, utils.Diff{
+				Name:    "AlertWhen",
+				Desired: alertWhen,
+				Actual:  actualAlertWhen,
+			}
+		}
+	}
+
+	return true, utils.Diff{}
 }
 
 // +kubebuilder:validation:Enum=Never;FiveMinutes;TenMinutes;Hour;TwoHours;SixHours;TwelveHours;TwentyFourHours
@@ -1874,6 +2105,7 @@ func (in *RatioQ2Filters) DeepEqual(filters *alerts.AlertFilters_RatioAlert) (bo
 type FiltersLogSeverity string
 
 type TracingFilters struct {
+	//+kubebuilder:default=true
 	LatencyThresholdMS int `json:"latencyThresholdMS,omitempty"`
 
 	// +optional
@@ -1881,6 +2113,34 @@ type TracingFilters struct {
 
 	// +optional
 	FieldFilters []FieldFilter `json:"fieldFilters,omitempty"`
+}
+
+func (in *TracingFilters) DeepEqual(filters *alerts.TracingAlert) (bool, utils.Diff) {
+	if latencyThresholdMS, actualLatencyThresholdMS := in.LatencyThresholdMS, int(filters.ConditionLatency); latencyThresholdMS != actualLatencyThresholdMS {
+		return false, utils.Diff{
+			Name:    "LatencyThresholdMS",
+			Desired: latencyThresholdMS,
+			Actual:  actualLatencyThresholdMS,
+		}
+	}
+
+	//if tagFilters, actualTagFilters := in.TagFilters, filters.TagFilters; latencyThresholdMS != actualLatencyThresholdMS{
+	//	return false, utils.Diff{
+	//		Name: "LatencyThresholdMS",
+	//		Desired: latencyThresholdMS,
+	//		Actual: actualLatencyThresholdMS,
+	//	}
+	//}
+	//
+	//if latencyThresholdMS, actualLatencyThresholdMS := in.LatencyThresholdMS, int(filters.ConditionLatency); latencyThresholdMS != actualLatencyThresholdMS{
+	//	return false, utils.Diff{
+	//		Name: "LatencyThresholdMS",
+	//		Desired: latencyThresholdMS,
+	//		Actual: actualLatencyThresholdMS,
+	//	}
+	//}
+
+	return true, utils.Diff{}
 }
 
 type TagFilter struct {
