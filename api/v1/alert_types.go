@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	utils "coralogix-operator-poc/api"
 	alerts "coralogix-operator-poc/controllers/clientset/grpc/alerts/v1"
@@ -96,6 +97,24 @@ var (
 		"Count":      alerts.MetricAlertConditionParameters_ARITHMETIC_OPERATOR_COUNT,
 		"Percentile": alerts.MetricAlertConditionParameters_ARITHMETIC_OPERATOR_PERCENTILE,
 	}
+	alertSchemaTracingFilterFieldToProtoTracingFilterField = map[FieldFilterType]string{
+		"Application": "applicationName",
+		"Subsystem":   "subsystemName",
+		"Service":     "serviceName",
+	}
+	alertSchemaTracingOperatorToProtoTracingOperator = map[FilterOperator]string{
+		"Equals":    "equals",
+		"Contains":  "contains",
+		"StartWith": "startsWith",
+		"EndWith":   "endsWith",
+	}
+	alertSchemaFlowOperatorToProtoFlowOperator = map[FlowOperator]alerts.FlowOperator{
+		"And": alerts.FlowOperator_AND,
+		"Or":  alerts.FlowOperator_OR,
+	}
+	msInHour   = int(time.Hour.Milliseconds())
+	msInMinute = int(time.Minute.Milliseconds())
+	msInSecond = int(time.Second.Milliseconds())
 )
 
 type protoTimeFrameAndRelativeTimeFrame struct {
@@ -194,7 +213,8 @@ func expandAlertType(alertType AlertType, onTriggerAndResolved, notifyOnlyOnTrig
 
 func expandStandard(standard *Standard, notifyWhenResolved, notifyOnlyOnTriggeredGroupByValues bool) alertTypeParams {
 	condition := expandStandardCondition(standard.Conditions, notifyWhenResolved, notifyOnlyOnTriggeredGroupByValues)
-	filters := expandStandardFilters(standard.Filters)
+	filters := expandCommonFilters(standard.Filters)
+	filters.FilterType = alerts.AlertFilters_FILTER_TYPE_TEXT_OR_UNSPECIFIED
 	return alertTypeParams{
 		condition: condition,
 		filters:   filters,
@@ -202,47 +222,558 @@ func expandStandard(standard *Standard, notifyWhenResolved, notifyOnlyOnTriggere
 }
 
 func expandRatio(ratio *Ratio, notifyWhenResolved, notifyOnlyOnTriggeredGroupByValues, ignoreInfinity bool) alertTypeParams {
-	return alertTypeParams{}
+	groupBy := utils.StringSliceToWrappedStringSlice(ratio.Conditions.GroupBy)
+	var groupByQ1, groupByQ2 []*wrapperspb.StringValue
+	if groupByFor := ratio.Conditions.GroupByFor; groupByFor != nil {
+		switch string(*groupByFor) {
+		case "Q1":
+			groupByQ1 = groupBy
+		case "Q2":
+			groupByQ2 = groupBy
+		case "Both":
+			groupByQ1 = groupBy
+			groupByQ2 = groupBy
+		}
+	}
+
+	condition := expandRatioCondition(ratio.Conditions, groupByQ1, notifyWhenResolved, notifyOnlyOnTriggeredGroupByValues, ignoreInfinity)
+	filters := expandRatioFilters(&ratio.Query1Filters, &ratio.Query2Filters, groupByQ2)
+
+	return alertTypeParams{
+		condition: condition,
+		filters:   filters,
+	}
+}
+
+func expandRatioCondition(conditions RatioConditions, q1GroupBy []*wrapperspb.StringValue, notifyWhenResolved, notifyOnlyOnTriggeredGroupByValues, ignoreInf bool) *alerts.AlertCondition {
+	threshold := wrapperspb.Double(conditions.Ratio.AsApproximateFloat64())
+	timeFrame := alertSchemaTimeWindowToProtoTimeWindow[string(conditions.TimeWindow)]
+	notifyOnResolved := wrapperspb.Bool(notifyWhenResolved)
+	notifyGroupByOnlyAlerts := wrapperspb.Bool(notifyOnlyOnTriggeredGroupByValues)
+	ignoreInfinity := wrapperspb.Bool(ignoreInf)
+	relatedExtendedData := expandRelatedData(conditions.ManageUndetectedValues)
+
+	parameters := &alerts.ConditionParameters{
+		Threshold:               threshold,
+		Timeframe:               timeFrame,
+		GroupBy:                 q1GroupBy,
+		NotifyOnResolved:        notifyOnResolved,
+		IgnoreInfinity:          ignoreInfinity,
+		NotifyGroupByOnlyAlerts: notifyGroupByOnlyAlerts,
+		RelatedExtendedData:     relatedExtendedData,
+	}
+
+	switch conditions.AlertWhen {
+	case "More":
+		return &alerts.AlertCondition{
+			Condition: &alerts.AlertCondition_MoreThan{
+				MoreThan: &alerts.MoreThanCondition{Parameters: parameters},
+			},
+		}
+	case "Less":
+		return &alerts.AlertCondition{
+			Condition: &alerts.AlertCondition_LessThan{
+				LessThan: &alerts.LessThanCondition{Parameters: parameters},
+			},
+		}
+	}
+
+	return nil
+}
+
+func expandRatioFilters(q1Filters *Filters, q2Filters *RatioQ2Filters, groupByQ2 []*wrapperspb.StringValue) *alerts.AlertFilters {
+	filters := expandCommonFilters(q1Filters)
+	if q1Alias := q1Filters.Alias; q1Alias != nil {
+		filters.Alias = wrapperspb.String(*q1Alias)
+	}
+	q2 := expandQ2Filters(q2Filters, groupByQ2)
+	filters.RatioAlerts = []*alerts.AlertFilters_RatioAlert{q2}
+	filters.FilterType = alerts.AlertFilters_FILTER_TYPE_RATIO
+	return filters
+}
+
+func expandQ2Filters(q2Filters *RatioQ2Filters, q2GroupBy []*wrapperspb.StringValue) *alerts.AlertFilters_RatioAlert {
+	var text *wrapperspb.StringValue
+	if searchQuery := q2Filters.SearchQuery; searchQuery != nil {
+		text = wrapperspb.String(*searchQuery)
+	}
+	alias := wrapperspb.String(q2Filters.Alias)
+	severities := expandAlertFiltersSeverities(q2Filters.Severities)
+	applications := utils.StringSliceToWrappedStringSlice(q2Filters.Applications)
+	subsystems := utils.StringSliceToWrappedStringSlice(q2Filters.Subsystems)
+
+	return &alerts.AlertFilters_RatioAlert{
+		Alias:        alias,
+		Text:         text,
+		Severities:   severities,
+		Applications: applications,
+		Subsystems:   subsystems,
+		GroupBy:      q2GroupBy,
+	}
 }
 
 func expandNewValue(newValue *NewValue) alertTypeParams {
-	return alertTypeParams{}
+	condition := expandNewValueCondition(&newValue.Conditions)
+	filters := expandCommonFilters(newValue.Filters)
+	filters.FilterType = alerts.AlertFilters_FILTER_TYPE_TEXT_OR_UNSPECIFIED
+	return alertTypeParams{
+		condition: condition,
+		filters:   filters,
+	}
 }
 
-func expandUniqueCount(count *UniqueCount) alertTypeParams {
-	return alertTypeParams{}
+func expandNewValueCondition(conditions *NewValueConditions) *alerts.AlertCondition {
+	timeFrame := alertSchemaTimeWindowToProtoTimeWindow[string(conditions.TimeWindow)]
+	groupBy := []*wrapperspb.StringValue{wrapperspb.String(conditions.Key)}
+	parameters := &alerts.ConditionParameters{
+		Timeframe: timeFrame,
+		GroupBy:   groupBy,
+	}
+
+	return &alerts.AlertCondition{
+		Condition: &alerts.AlertCondition_NewValue{
+			NewValue: &alerts.NewValueCondition{
+				Parameters: parameters,
+			},
+		},
+	}
+}
+
+func expandUniqueCount(uniqueCount *UniqueCount) alertTypeParams {
+	condition := expandUniqueCountCondition(&uniqueCount.Conditions)
+	filters := expandCommonFilters(uniqueCount.Filters)
+	filters.FilterType = alerts.AlertFilters_FILTER_TYPE_UNIQUE_COUNT
+	return alertTypeParams{
+		condition: condition,
+		filters:   filters,
+	}
+}
+
+func expandUniqueCountCondition(conditions *UniqueCountConditions) *alerts.AlertCondition {
+	uniqueCountKey := []*wrapperspb.StringValue{wrapperspb.String(conditions.Key)}
+	threshold := wrapperspb.Double(float64(conditions.MaxUniqueValues))
+	timeFrame := alertSchemaTimeWindowToProtoTimeWindow[string(conditions.TimeWindow)]
+	var groupBy []*wrapperspb.StringValue
+	var groupByThreshold *wrapperspb.UInt32Value
+	if groupByKey := conditions.GroupBy; groupByKey != nil {
+		wrapperspb.String(*groupByKey)
+		groupByThreshold = wrapperspb.UInt32(uint32(*conditions.MaxUniqueValuesForGroupBy))
+	}
+
+	parameters := &alerts.ConditionParameters{
+		CardinalityFields:                 uniqueCountKey,
+		Threshold:                         threshold,
+		Timeframe:                         timeFrame,
+		GroupBy:                           groupBy,
+		MaxUniqueCountValuesForGroupByKey: groupByThreshold,
+	}
+
+	return &alerts.AlertCondition{
+		Condition: &alerts.AlertCondition_UniqueCount{
+			UniqueCount: &alerts.UniqueCountCondition{
+				Parameters: parameters,
+			},
+		},
+	}
 }
 
 func expandTimeRelative(timeRelative *TimeRelative, notifyWhenResolved, notifyOnlyOnTriggeredGroupByValues, ignoreInfinity bool) alertTypeParams {
-	return alertTypeParams{}
+	condition := expandTimeRelativeCondition(&timeRelative.Conditions, notifyWhenResolved, notifyOnlyOnTriggeredGroupByValues, ignoreInfinity)
+	filters := expandCommonFilters(timeRelative.Filters)
+	filters.FilterType = alerts.AlertFilters_FILTER_TYPE_UNIQUE_COUNT
+	return alertTypeParams{
+		condition: condition,
+		filters:   filters,
+	}
+}
+
+func expandTimeRelativeCondition(condition *TimeRelativeConditions, notifyWhenResolved, notifyOnlyOnTriggeredGroupByValues, ignoreInfinity bool) *alerts.AlertCondition {
+	threshold := wrapperspb.Double(condition.Threshold.AsApproximateFloat64())
+	timeFrameAndRelativeTimeFrame := alertSchemaRelativeTimeFrameToProtoTimeFrameAndRelativeTimeFrame[condition.TimeWindow]
+	groupBy := utils.StringSliceToWrappedStringSlice(condition.GroupBy)
+	notifyOnResolved := wrapperspb.Bool(notifyWhenResolved)
+	notifyGroupByOnlyAlerts := wrapperspb.Bool(notifyOnlyOnTriggeredGroupByValues)
+	ignoreInf := wrapperspb.Bool(ignoreInfinity)
+	relatedExtendedData := expandRelatedData(condition.ManageUndetectedValues)
+
+	parameters := &alerts.ConditionParameters{
+		Timeframe:               timeFrameAndRelativeTimeFrame.timeFrame,
+		RelativeTimeframe:       timeFrameAndRelativeTimeFrame.relativeTimeFrame,
+		GroupBy:                 groupBy,
+		Threshold:               threshold,
+		IgnoreInfinity:          ignoreInf,
+		NotifyOnResolved:        notifyOnResolved,
+		NotifyGroupByOnlyAlerts: notifyGroupByOnlyAlerts,
+		RelatedExtendedData:     relatedExtendedData,
+	}
+
+	switch condition.AlertWhen {
+	case "More":
+		return &alerts.AlertCondition{
+			Condition: &alerts.AlertCondition_MoreThan{
+				MoreThan: &alerts.MoreThanCondition{Parameters: parameters},
+			},
+		}
+	case "Less":
+		return &alerts.AlertCondition{
+			Condition: &alerts.AlertCondition_LessThan{
+				LessThan: &alerts.LessThanCondition{Parameters: parameters},
+			},
+		}
+	}
+
+	return nil
 }
 
 func expandMetric(metric *Metric, notifyWhenResolved, notifyOnlyOnTriggeredGroupByValues bool) alertTypeParams {
+	if promql := metric.Promql; promql != nil {
+		return expandPromql(promql, notifyWhenResolved)
+	} else if lucene := metric.Lucene; lucene != nil {
+		return expandLucene(lucene, notifyWhenResolved, notifyOnlyOnTriggeredGroupByValues)
+	}
+
 	return alertTypeParams{}
+}
+
+func expandPromql(promql *Promql, notifyWhenResolved bool) alertTypeParams {
+	condition := expandPromqlCondition(&promql.Conditions, promql.SearchQuery, notifyWhenResolved)
+	filters := &alerts.AlertFilters{
+		FilterType: alerts.AlertFilters_FILTER_TYPE_METRIC,
+	}
+
+	return alertTypeParams{
+		condition: condition,
+		filters:   filters,
+	}
+}
+
+func expandPromqlCondition(conditions *PromqlConditions, searchQuery *string, notifyWhenResolved bool) *alerts.AlertCondition {
+	var text *wrapperspb.StringValue
+	if searchQuery != nil {
+		text = wrapperspb.String(*searchQuery)
+	}
+	sampleThresholdPercentage := wrapperspb.UInt32(uint32(conditions.SampleThresholdPercentage))
+	var nonNullPercentage *wrapperspb.UInt32Value
+	if minNonNullValuesPercentage := conditions.MinNonNullValuesPercentage; minNonNullValuesPercentage != nil {
+		nonNullPercentage = wrapperspb.UInt32(uint32(*minNonNullValuesPercentage))
+	}
+	swapNullValues := wrapperspb.Bool(conditions.ReplaceMissingValueWithZero)
+	promqlParams := &alerts.MetricAlertPromqlConditionParameters{
+		PromqlText:                text,
+		SampleThresholdPercentage: sampleThresholdPercentage,
+		NonNullPercentage:         nonNullPercentage,
+		SwapNullValues:            swapNullValues,
+	}
+	threshold := wrapperspb.Double(conditions.Threshold.AsApproximateFloat64())
+	timeWindow := alertSchemaTimeWindowToProtoTimeWindow[string(conditions.TimeWindow)]
+	relatedExtendedData := expandRelatedData(conditions.ManageUndetectedValues)
+	notifyOnResolved := wrapperspb.Bool(notifyWhenResolved)
+
+	parameters := &alerts.ConditionParameters{
+		Threshold:                   threshold,
+		Timeframe:                   timeWindow,
+		RelatedExtendedData:         relatedExtendedData,
+		MetricAlertPromqlParameters: promqlParams,
+		NotifyOnResolved:            notifyOnResolved,
+	}
+
+	switch conditions.AlertWhen {
+	case "More":
+		return &alerts.AlertCondition{
+			Condition: &alerts.AlertCondition_MoreThan{
+				MoreThan: &alerts.MoreThanCondition{Parameters: parameters},
+			},
+		}
+	case "Less":
+		return &alerts.AlertCondition{
+			Condition: &alerts.AlertCondition_LessThan{
+				LessThan: &alerts.LessThanCondition{Parameters: parameters},
+			},
+		}
+	}
+
+	return nil
+}
+
+func expandLucene(lucene *Lucene, notifyWhenResolved, notifyOnlyOnTriggeredGroupByValues bool) alertTypeParams {
+	condition := expandLuceneCondition(&lucene.Conditions, notifyWhenResolved, notifyOnlyOnTriggeredGroupByValues)
+	var text *wrapperspb.StringValue
+	if searchQuery := lucene.SearchQuery; searchQuery != nil {
+		text = wrapperspb.String(*searchQuery)
+	}
+
+	filters := &alerts.AlertFilters{
+		FilterType: alerts.AlertFilters_FILTER_TYPE_METRIC,
+		Text:       text,
+	}
+
+	return alertTypeParams{
+		condition: condition,
+		filters:   filters,
+	}
+}
+
+func expandLuceneCondition(conditions *LuceneConditions, notifyWhenResolved, notifyOnlyOnTriggeredGroupByValues bool) *alerts.AlertCondition {
+	metricField := wrapperspb.String(conditions.MetricField)
+	arithmeticOperator := alertSchemaArithmeticOperatorToProtoArithmeticOperator[conditions.ArithmeticOperator]
+	var arithmeticOperatorModifier *wrapperspb.UInt32Value
+	if modifier := conditions.ArithmeticOperatorModifier; modifier != nil {
+		arithmeticOperatorModifier = wrapperspb.UInt32(uint32(*modifier))
+	}
+	sampleThresholdPercentage := wrapperspb.UInt32(uint32(conditions.SampleThresholdPercentage))
+	swapNullValues := wrapperspb.Bool(conditions.ReplaceMissingValueWithZero)
+	var nonNullPercentage *wrapperspb.UInt32Value
+	if minNonNullValuesPercentage := conditions.MinNonNullValuesPercentage; minNonNullValuesPercentage != nil {
+		nonNullPercentage = wrapperspb.UInt32(uint32(*minNonNullValuesPercentage))
+	}
+	luceneParams := &alerts.MetricAlertConditionParameters{
+		MetricSource:               alerts.MetricAlertConditionParameters_METRIC_SOURCE_LOGS2METRICS_OR_UNSPECIFIED,
+		MetricField:                metricField,
+		ArithmeticOperator:         arithmeticOperator,
+		ArithmeticOperatorModifier: arithmeticOperatorModifier,
+		SampleThresholdPercentage:  sampleThresholdPercentage,
+		NonNullPercentage:          nonNullPercentage,
+		SwapNullValues:             swapNullValues,
+	}
+
+	groupBy := utils.StringSliceToWrappedStringSlice(conditions.GroupBy)
+	threshold := wrapperspb.Double(conditions.Threshold.AsApproximateFloat64())
+	timeWindow := alertSchemaTimeWindowToProtoTimeWindow[string(conditions.TimeWindow)]
+	relatedExtendedData := expandRelatedData(conditions.ManageUndetectedValues)
+	notifyOnResolved := wrapperspb.Bool(notifyWhenResolved)
+	notifyGroupByOnlyAlerts := wrapperspb.Bool(notifyOnlyOnTriggeredGroupByValues)
+
+	parameters := &alerts.ConditionParameters{
+		GroupBy:                 groupBy,
+		Threshold:               threshold,
+		Timeframe:               timeWindow,
+		RelatedExtendedData:     relatedExtendedData,
+		NotifyOnResolved:        notifyOnResolved,
+		NotifyGroupByOnlyAlerts: notifyGroupByOnlyAlerts,
+		MetricAlertParameters:   luceneParams,
+	}
+
+	switch conditions.AlertWhen {
+	case "More":
+		return &alerts.AlertCondition{
+			Condition: &alerts.AlertCondition_MoreThan{
+				MoreThan: &alerts.MoreThanCondition{Parameters: parameters},
+			},
+		}
+	case "Less":
+		return &alerts.AlertCondition{
+			Condition: &alerts.AlertCondition_LessThan{
+				LessThan: &alerts.LessThanCondition{Parameters: parameters},
+			},
+		}
+	}
+
+	return nil
 }
 
 func expandTracing(tracing *Tracing, notifyWhenResolved bool) alertTypeParams {
-	return alertTypeParams{}
+	filters := &alerts.AlertFilters{
+		FilterType: alerts.AlertFilters_FILTER_TYPE_TRACING,
+	}
+	condition := expandTracingCondition(&tracing.Conditions, notifyWhenResolved)
+	tracingAlert := expandTracingAlert(&tracing.Filters)
+	return alertTypeParams{
+		filters:      filters,
+		condition:    condition,
+		tracingAlert: tracingAlert,
+	}
+}
+
+func expandTracingCondition(conditions *TracingCondition, notifyWhenResolved bool) *alerts.AlertCondition {
+	switch conditions.AlertWhen {
+	case "More":
+		var timeFrame alerts.Timeframe
+		if timeWindow := conditions.TimeWindow; timeWindow != nil {
+			timeFrame = alertSchemaTimeWindowToProtoTimeWindow[string(*timeWindow)]
+		}
+		groupBy := utils.StringSliceToWrappedStringSlice(conditions.GroupBy)
+		threshold := wrapperspb.Double(conditions.Threshold.AsApproximateFloat64())
+		notifyOnResolved := wrapperspb.Bool(notifyWhenResolved)
+		return &alerts.AlertCondition{
+			Condition: &alerts.AlertCondition_MoreThan{
+				MoreThan: &alerts.MoreThanCondition{
+					Parameters: &alerts.ConditionParameters{
+						Timeframe:        timeFrame,
+						Threshold:        threshold,
+						GroupBy:          groupBy,
+						NotifyOnResolved: notifyOnResolved,
+					},
+				},
+			},
+		}
+	case "Immediately":
+		return &alerts.AlertCondition{
+			Condition: &alerts.AlertCondition_Immediate{},
+		}
+	}
+
+	return nil
+}
+
+func expandTracingAlert(tracingFilters *TracingFilters) *alerts.TracingAlert {
+	conditionLatency := uint32(tracingFilters.LatencyThresholdMS) * uint32(time.Millisecond.Microseconds())
+	fieldFilters := expandFieldFilters(tracingFilters.FieldFilters)
+	tagFilters := expandTagFilters(tracingFilters.TagFilters)
+	return &alerts.TracingAlert{
+		ConditionLatency: conditionLatency,
+		FieldFilters:     fieldFilters,
+		TagFilters:       tagFilters,
+	}
+}
+
+func expandFieldFilters(fieldFilters []FieldFilter) []*alerts.FilterData {
+	result := make([]*alerts.FilterData, 0, len(fieldFilters))
+	for _, ff := range fieldFilters {
+		field := alertSchemaTracingFilterFieldToProtoTracingFilterField[ff.Field]
+		filters := make([]*alerts.Filters, 0, len(ff.Filters))
+		for _, f := range ff.Filters {
+			values := f.Values
+			operator := alertSchemaTracingOperatorToProtoTracingOperator[f.Operator]
+			filter := &alerts.Filters{
+				Values:   values,
+				Operator: operator,
+			}
+			filters = append(filters, filter)
+		}
+
+		filterData := &alerts.FilterData{
+			Field:   field,
+			Filters: filters,
+		}
+		result = append(result, filterData)
+	}
+	return result
+}
+
+func expandTagFilters(tagFilters []TagFilter) []*alerts.FilterData {
+	result := make([]*alerts.FilterData, 0, len(tagFilters))
+	for _, tf := range tagFilters {
+		field := tf.Field
+		filters := make([]*alerts.Filters, 0, len(tf.Filters))
+		for _, f := range tf.Filters {
+			values := f.Values
+			operator := alertSchemaTracingOperatorToProtoTracingOperator[f.Operator]
+			filter := &alerts.Filters{
+				Values:   values,
+				Operator: operator,
+			}
+			filters = append(filters, filter)
+		}
+
+		filterData := &alerts.FilterData{
+			Field:   field,
+			Filters: filters,
+		}
+		result = append(result, filterData)
+	}
+	return result
 }
 
 func expandFlow(flow *Flow) alertTypeParams {
-	return alertTypeParams{}
+	stages := expandFlowStages(flow.Stages)
+	return alertTypeParams{
+		condition: &alerts.AlertCondition{
+			Condition: &alerts.AlertCondition_Flow{
+				Flow: &alerts.FlowCondition{
+					Stages: stages,
+				},
+			},
+		},
+		filters: &alerts.AlertFilters{
+			FilterType: alerts.AlertFilters_FILTER_TYPE_FLOW,
+		},
+	}
 }
 
-func expandStandardFilters(filters *Filters) *alerts.AlertFilters {
+func expandFlowStages(stages []FlowStage) []*alerts.FlowStage {
+	result := make([]*alerts.FlowStage, 0, len(stages))
+	for _, s := range stages {
+		stage := expandFlowStage(s)
+		result = append(result, stage)
+	}
+	return result
+}
+
+func expandFlowStage(stage FlowStage) *alerts.FlowStage {
+	groups := expandFlowStageGroups(stage.Groups)
+	var timeFrame *alerts.FlowTimeframe
+	if timeWindow := stage.TimeWindow; timeWindow != nil {
+		timeFrame = new(alerts.FlowTimeframe)
+		timeFrame.Ms = wrapperspb.UInt32(uint32(expandTimeToMS(*timeWindow)))
+	}
+
+	return &alerts.FlowStage{
+		Groups:    groups,
+		Timeframe: timeFrame,
+	}
+}
+
+func expandTimeToMS(t FlowStageTimeFrame) int {
+	timeMS := msInHour * t.Hours
+	timeMS += msInMinute * t.Minutes
+	timeMS += msInSecond * t.Seconds
+
+	return timeMS
+}
+
+func expandFlowStageGroups(groups []FlowStageGroup) []*alerts.FlowGroup {
+	result := make([]*alerts.FlowGroup, 0, len(groups))
+	for _, g := range groups {
+		group := expandFlowStageGroup(g)
+		result = append(result, group)
+	}
+	return result
+}
+
+func expandFlowStageGroup(group FlowStageGroup) *alerts.FlowGroup {
+	subAlerts := expandFlowSubgroupAlerts(group.SubgroupAlerts)
+	nextOp := alertSchemaFlowOperatorToProtoFlowOperator[group.Operator]
+	return &alerts.FlowGroup{
+		Alerts: subAlerts,
+		NextOp: nextOp,
+	}
+}
+
+func expandFlowSubgroupAlerts(subgroup SubgroupAlerts) *alerts.FlowAlerts {
+	return &alerts.FlowAlerts{
+		Op:     alertSchemaFlowOperatorToProtoFlowOperator[subgroup.Operator],
+		Values: expandFlowInnerAlerts(subgroup.Alerts),
+	}
+}
+
+func expandFlowInnerAlerts(innerAlerts []InnerFlowAlert) []*alerts.FlowAlert {
+	result := make([]*alerts.FlowAlert, 0, len(innerAlerts))
+	for _, a := range innerAlerts {
+		alert := expandFlowInnerAlert(a)
+		result = append(result, alert)
+	}
+	return result
+}
+
+func expandFlowInnerAlert(alert InnerFlowAlert) *alerts.FlowAlert {
+	return &alerts.FlowAlert{
+		Id:  wrapperspb.String(alert.UserAlertId),
+		Not: wrapperspb.Bool(alert.Not),
+	}
+}
+
+func expandCommonFilters(filters *Filters) *alerts.AlertFilters {
 	severities := expandAlertFiltersSeverities(filters.Severities)
 	metadata := expandMetadata(filters)
-
-	filter := &alerts.AlertFilters{
+	var text *wrapperspb.StringValue
+	if searchQuery := filters.SearchQuery; searchQuery != nil {
+		text = wrapperspb.String(*searchQuery)
+	}
+	return &alerts.AlertFilters{
 		Severities: severities,
 		Metadata:   metadata,
+		Text:       text,
 	}
-
-	if searchQuery := filters.SearchQuery; searchQuery != nil {
-		filter.Text = wrapperspb.String(*searchQuery)
-	}
-
-	return filter
 }
 
 func expandAlertFiltersSeverities(severities []FiltersLogSeverity) []alerts.AlertFilters_LogSeverity {
@@ -274,42 +805,36 @@ func expandMetadata(filters *Filters) *alerts.AlertFilters_MetadataFilters {
 }
 
 func expandStandardCondition(condition StandardConditions, notifyWhenResolved, notifyOnlyOnTriggeredGroupByValues bool) *alerts.AlertCondition {
+	var threshold *wrapperspb.DoubleValue
+	if condition.Threshold != nil {
+		threshold = wrapperspb.Double(float64(*condition.Threshold))
+	}
+	var timeFrame alerts.Timeframe
+	if condition.TimeWindow != nil {
+		timeFrame = alertSchemaTimeWindowToProtoTimeWindow[string(*condition.TimeWindow)]
+	}
+	groupBy := utils.StringSliceToWrappedStringSlice(condition.GroupBy)
+	notifyOnResolved := wrapperspb.Bool(notifyWhenResolved)
+	notifyGroupByOnlyAlerts := wrapperspb.Bool(notifyOnlyOnTriggeredGroupByValues)
+	relatedExtendedData := expandRelatedData(condition.ManageUndetectedValues)
+
+	parameters := &alerts.ConditionParameters{
+		Threshold:               threshold,
+		Timeframe:               timeFrame,
+		GroupBy:                 groupBy,
+		NotifyOnResolved:        notifyOnResolved,
+		NotifyGroupByOnlyAlerts: notifyGroupByOnlyAlerts,
+		RelatedExtendedData:     relatedExtendedData,
+	}
+
 	switch condition.AlertWhen {
 	case "More":
-		threshold := wrapperspb.Double(float64(*condition.Threshold))
-		timeFrame := alertSchemaTimeWindowToProtoTimeWindow[string(*condition.TimeWindow)]
-		groupBy := utils.StringSliceToWrappedStringSlice(condition.GroupBy)
-		parameters := &alerts.ConditionParameters{
-			Threshold: threshold,
-			Timeframe: timeFrame,
-			GroupBy:   groupBy,
-		}
-		parameters.NotifyOnResolved = wrapperspb.Bool(notifyWhenResolved)
-		parameters.NotifyGroupByOnlyAlerts = wrapperspb.Bool(notifyOnlyOnTriggeredGroupByValues)
 		return &alerts.AlertCondition{
 			Condition: &alerts.AlertCondition_MoreThan{
 				MoreThan: &alerts.MoreThanCondition{Parameters: parameters},
 			},
 		}
 	case "Less":
-		threshold := wrapperspb.Double(float64(*condition.Threshold))
-		timeFrame := alertSchemaTimeWindowToProtoTimeWindow[string(*condition.TimeWindow)]
-		groupBy := utils.StringSliceToWrappedStringSlice(condition.GroupBy)
-		parameters := &alerts.ConditionParameters{
-			Threshold: threshold,
-			Timeframe: timeFrame,
-			GroupBy:   groupBy,
-		}
-
-		parameters.NotifyOnResolved = wrapperspb.Bool(notifyWhenResolved)
-		parameters.NotifyGroupByOnlyAlerts = wrapperspb.Bool(notifyOnlyOnTriggeredGroupByValues)
-
-		if manageUndetectedValues := condition.ManageUndetectedValues; manageUndetectedValues != nil {
-			parameters.RelatedExtendedData = new(alerts.RelatedExtendedData)
-			parameters.RelatedExtendedData.ShouldTriggerDeadman = wrapperspb.Bool(manageUndetectedValues.EnableTriggeringOnUndetectedValues)
-			cleanupAutoRetireRatio := alertSchemaAutoRetireRatioToProtoAutoRetireRatio[*manageUndetectedValues.AutoRetireRatio]
-			parameters.RelatedExtendedData.CleanupDeadmanDuration = &cleanupAutoRetireRatio
-		}
 		return &alerts.AlertCondition{
 			Condition: &alerts.AlertCondition_LessThan{
 				LessThan: &alerts.LessThanCondition{Parameters: parameters},
@@ -320,12 +845,6 @@ func expandStandardCondition(condition StandardConditions, notifyWhenResolved, n
 			Condition: &alerts.AlertCondition_Immediate{},
 		}
 	case "MoreThanUsual":
-		threshold := wrapperspb.Double(float64(*condition.Threshold))
-		groupBy := utils.StringSliceToWrappedStringSlice(condition.GroupBy)
-		parameters := &alerts.ConditionParameters{
-			Threshold: threshold,
-			GroupBy:   groupBy,
-		}
 		return &alerts.AlertCondition{
 			Condition: &alerts.AlertCondition_MoreThanUsual{
 				MoreThanUsual: &alerts.MoreThanUsualCondition{Parameters: parameters},
@@ -333,6 +852,18 @@ func expandStandardCondition(condition StandardConditions, notifyWhenResolved, n
 		}
 	}
 
+	return nil
+}
+
+func expandRelatedData(manageUndetectedValues *ManageUndetectedValues) *alerts.RelatedExtendedData {
+	if manageUndetectedValues != nil {
+		shouldTriggerDeadman := wrapperspb.Bool(manageUndetectedValues.EnableTriggeringOnUndetectedValues)
+		cleanupDeadmanDuration := alertSchemaAutoRetireRatioToProtoAutoRetireRatio[*manageUndetectedValues.AutoRetireRatio]
+		return &alerts.RelatedExtendedData{
+			ShouldTriggerDeadman:   shouldTriggerDeadman,
+			CleanupDeadmanDuration: &cleanupDeadmanDuration,
+		}
+	}
 	return nil
 }
 
@@ -889,7 +1420,8 @@ type Ratio struct {
 }
 
 type RatioQ2Filters struct {
-	Alias *string `json:"alias,omitempty"`
+	// +optional
+	Alias string `json:"alias,omitempty"`
 
 	// +optional
 	SearchQuery *string `json:"searchQuery,omitempty"`
@@ -1183,6 +1715,24 @@ type Flow struct {
 }
 
 func (in *Flow) DeepEqual(flow *alerts.FlowCondition) (bool, utils.Diff) {
+	if stages, actualStages := in.Stages, flow.Stages; len(stages) != len(actualStages) {
+		return false, utils.Diff{
+			Name:    "Stages",
+			Desired: stages,
+			Actual:  actualStages,
+		}
+	} else {
+		for i, stage := range stages {
+			if equal, diff := stage.DeepEqual(actualStages[i]); !equal {
+				return false, utils.Diff{
+					Name:    fmt.Sprintf("Stages.%d.%s", i, diff.Name),
+					Desired: diff.Desired,
+					Actual:  diff.Actual,
+				}
+			}
+		}
+	}
+
 	return true, utils.Diff{}
 }
 
@@ -1719,7 +2269,7 @@ func (in *LuceneConditions) DeepEqual(conditionParams *alerts.ConditionParameter
 		}
 	}
 
-	data.notifyOnlyOnTriggeredGroupByValues = conditionParams.NotifyPerGroupByValue
+	data.notifyOnlyOnTriggeredGroupByValues = conditionParams.NotifyGroupByOnlyAlerts
 	data.onTriggerAndResolved = conditionParams.NotifyOnResolved
 
 	return true, utils.Diff{}
@@ -1740,7 +2290,7 @@ type PromqlConditions struct {
 	GroupBy []string `json:"groupBy,omitempty"`
 
 	// +optional
-	ReplaceMissingValueWithZero *bool `json:"replaceMissingValueWithZero,omitempty"`
+	ReplaceMissingValueWithZero bool `json:"replaceMissingValueWithZero,omitempty"`
 
 	// +kubebuilder:validation:Minimum:=0
 	// +kubebuilder:validation:MultipleOf:=10
@@ -1813,7 +2363,7 @@ func (in *PromqlConditions) DeepEqual(conditionParams *alerts.ConditionParameter
 		}
 	}
 
-	data.notifyOnlyOnTriggeredGroupByValues = conditionParams.NotifyPerGroupByValue
+	data.notifyOnlyOnTriggeredGroupByValues = conditionParams.NotifyGroupByOnlyAlerts
 	data.onTriggerAndResolved = conditionParams.NotifyOnResolved
 
 	return true, utils.Diff{}
@@ -2046,13 +2596,7 @@ func (in *Filters) DeepEqual(filters *alerts.AlertFilters) (bool, utils.Diff) {
 }
 
 func (in *RatioQ2Filters) DeepEqual(filters *alerts.AlertFilters_RatioAlert) (bool, utils.Diff) {
-	if alias, actualAlias := in.Alias, filters.GetAlias(); alias == nil && actualAlias != nil {
-		return false, utils.Diff{
-			Name:    "Alias",
-			Desired: alias,
-			Actual:  *actualAlias,
-		}
-	} else if alias, actualAlias := *alias, actualAlias.GetValue(); alias != actualAlias {
+	if alias, actualAlias := in.Alias, filters.GetAlias().GetValue(); actualAlias != alias {
 		return false, utils.Diff{
 			Name:    "Alias",
 			Desired: alias,
@@ -2105,7 +2649,6 @@ func (in *RatioQ2Filters) DeepEqual(filters *alerts.AlertFilters_RatioAlert) (bo
 type FiltersLogSeverity string
 
 type TracingFilters struct {
-	//+kubebuilder:default=true
 	LatencyThresholdMS int `json:"latencyThresholdMS,omitempty"`
 
 	// +optional
@@ -2144,22 +2687,25 @@ func (in *TracingFilters) DeepEqual(filters *alerts.TracingAlert) (bool, utils.D
 }
 
 type TagFilter struct {
-	Field    string         `json:"field,omitempty"`
-	Values   []string       `json:"values,omitempty"`
-	Operator FilterOperator `json:"operator,omitempty"`
+	Field   string          `json:"field,omitempty"`
+	Filters []TracingFilter `json:"filters,omitempty"`
 }
 
 type FieldFilter struct {
-	Field    string             `json:"field,omitempty"`
-	Values   []FieldFilterValue `json:"values,omitempty"`
-	Operator FilterOperator     `json:"operator,omitempty"`
+	Field   FieldFilterType `json:"field,omitempty"`
+	Filters []TracingFilter `json:"filters,omitempty"`
+}
+
+type TracingFilter struct {
+	Values   []string       `json:"values,omitempty"`
+	Operator FilterOperator `json:"operator,omitempty"`
 }
 
 // +kubebuilder:validation:Enum=Equals;Contains;StartWith;EndWith;
 type FilterOperator string
 
 // +kubebuilder:validation:Enum=Application;Subsystem;Service;
-type FieldFilterValue string
+type FieldFilterType string
 
 type ManageUndetectedValues struct {
 	//+kubebuilder:default=true
@@ -2189,9 +2735,54 @@ func (in *ManageUndetectedValues) DeepEqual(manageUndetectedValues *alerts.Relat
 }
 
 type FlowStage struct {
-	TimeWindow FlowStageTimeFrame `json:"timeWindow,omitempty"`
+	// +optional
+	TimeWindow *FlowStageTimeFrame `json:"timeWindow,omitempty"`
 
 	Groups []FlowStageGroup `json:"groups,omitempty"`
+}
+
+func (in *FlowStage) DeepEqual(stage *alerts.FlowStage) (bool, utils.Diff) {
+	if groups, actualGroups := in.Groups, stage.Groups; len(groups) != len(actualGroups) {
+		return false, utils.Diff{
+			Name:    "Groups",
+			Desired: groups,
+			Actual:  actualGroups,
+		}
+	} else {
+		for i, group := range groups {
+			if equal, diff := group.DeepEqual(actualGroups[i]); !equal {
+				return false, utils.Diff{
+					Name:    fmt.Sprintf("Groups.%d.%s", i, diff.Name),
+					Desired: diff.Desired,
+					Actual:  diff.Actual,
+				}
+			}
+		}
+	}
+
+	if timeFrame, actualTimeFrame := in.TimeWindow, stage.GetTimeframe(); timeFrame == nil && actualTimeFrame != nil {
+		return false, utils.Diff{
+			Name:    "TimeFrame",
+			Desired: timeFrame,
+			Actual:  *actualTimeFrame,
+		}
+	} else if timeFrame != nil && actualTimeFrame == nil {
+		return false, utils.Diff{
+			Name:    "TimeFrame",
+			Desired: *timeFrame,
+			Actual:  actualTimeFrame,
+		}
+	} else if timeFrame != nil && actualTimeFrame != nil {
+		if timeMS, actualTimeMS := expandTimeToMS(*timeFrame), int(actualTimeFrame.GetMs().GetValue()); timeMS != actualTimeMS {
+			return false, utils.Diff{
+				Name:    "TimeFrameMS",
+				Desired: timeMS,
+				Actual:  actualTimeMS,
+			}
+		}
+	}
+
+	return true, utils.Diff{}
 }
 
 type FlowStageTimeFrame struct {
@@ -2206,12 +2797,48 @@ type FlowStageTimeFrame struct {
 }
 
 type FlowStageGroup struct {
-	SubAlerts []SubAlert `json:"subAlerts,omitempty"`
+	SubgroupAlerts SubgroupAlerts `json:"subgroupAlerts,omitempty"`
 
-	Operator FlowStageGroupOperator `json:"operator,omitempty"`
+	Operator FlowOperator `json:"operator,omitempty"`
 }
 
-type SubAlert struct {
+func (in *FlowStageGroup) DeepEqual(group *alerts.FlowGroup) (bool, utils.Diff) {
+	if alerts, actualAlerts := in.SubgroupAlerts.Alerts, group.Alerts.Values; len(alerts) != len(actualAlerts) {
+		return false, utils.Diff{
+			Name:    "Alerts",
+			Desired: alerts,
+			Actual:  actualAlerts,
+		}
+	} else {
+		for i, alert := range alerts {
+			if equal, diff := alert.DeepEqual(actualAlerts[i]); !equal {
+				return false, utils.Diff{
+					Name:    fmt.Sprintf("Alerts.%d.%s", i, diff.Name),
+					Desired: diff.Desired,
+					Actual:  diff.Actual,
+				}
+			}
+		}
+	}
+
+	if operator, actualOperator := alertSchemaFlowOperatorToProtoFlowOperator[in.Operator], group.NextOp; operator != actualOperator {
+		return false, utils.Diff{
+			Name:    "Operator",
+			Desired: operator,
+			Actual:  actualOperator,
+		}
+	}
+
+	return true, utils.Diff{}
+}
+
+type SubgroupAlerts struct {
+	Operator FlowOperator `json:"operator,omitempty"`
+
+	Alerts []InnerFlowAlert `json:"alerts,omitempty"`
+}
+
+type InnerFlowAlert struct {
 	// +kubebuilder:default=false
 	Not bool `json:"not,omitempty"`
 
@@ -2219,8 +2846,27 @@ type SubAlert struct {
 	UserAlertId string `json:"userAlertId,omitempty"`
 }
 
+func (in *InnerFlowAlert) DeepEqual(alert *alerts.FlowAlert) (bool, utils.Diff) {
+	if not, actualNot := in.Not, alert.GetNot().GetValue(); not != actualNot {
+		return false, utils.Diff{
+			Name:    "Not",
+			Desired: not,
+			Actual:  actualNot,
+		}
+	}
+	if id, actualID := in.UserAlertId, alert.GetId().GetValue(); id != actualID {
+		return false, utils.Diff{
+			Name:    "ID",
+			Desired: id,
+			Actual:  actualID,
+		}
+	}
+
+	return true, utils.Diff{}
+}
+
 // +kubebuilder:validation:Enum=And;Or
-type FlowStageGroupOperator string
+type FlowOperator string
 
 // AlertStatus defines the observed state of Alert
 type AlertStatus struct {

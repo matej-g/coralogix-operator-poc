@@ -53,16 +53,24 @@ spec:
                                     - And
                                     - Or
                                     type: string
-                                  subAlerts:
-                                    items:
-                                      properties:
-                                        not:
-                                          default: false
-                                          type: boolean
-                                        userAlertId:
-                                          type: string
-                                      type: object
-                                    type: array
+                                  subgroupAlerts:
+                                    properties:
+                                      alerts:
+                                        items:
+                                          properties:
+                                            not:
+                                              default: false
+                                              type: boolean
+                                            userAlertId:
+                                              type: string
+                                          type: object
+                                        type: array
+                                      operator:
+                                        enum:
+                                        - And
+                                        - Or
+                                        type: string
+                                    type: object
                                 type: object
                               type: array
                             timeWindow:
@@ -656,42 +664,51 @@ spec:
                             items:
                               properties:
                                 field:
-                                  type: string
-                                operator:
                                   enum:
-                                  - Equals
-                                  - Contains
-                                  - StartWith
-                                  - EndWith
+                                  - Application
+                                  - Subsystem
+                                  - Service
                                   type: string
-                                values:
+                                filters:
                                   items:
-                                    enum:
-                                    - Application
-                                    - Subsystem
-                                    - Service
-                                    type: string
+                                    properties:
+                                      operator:
+                                        enum:
+                                        - Equals
+                                        - Contains
+                                        - StartWith
+                                        - EndWith
+                                        type: string
+                                      values:
+                                        items:
+                                          type: string
+                                        type: array
+                                    type: object
                                   type: array
                               type: object
                             type: array
                           latencyThresholdMS:
-                            default: true
                             type: integer
                           tagFilters:
                             items:
                               properties:
                                 field:
                                   type: string
-                                operator:
-                                  enum:
-                                  - Equals
-                                  - Contains
-                                  - StartWith
-                                  - EndWith
-                                  type: string
-                                values:
+                                filters:
                                   items:
-                                    type: string
+                                    properties:
+                                      operator:
+                                        enum:
+                                        - Equals
+                                        - Contains
+                                        - StartWith
+                                        - EndWith
+                                        type: string
+                                      values:
+                                        items:
+                                          type: string
+                                        type: array
+                                    type: object
                                   type: array
                               type: object
                             type: array
