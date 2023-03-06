@@ -20,9 +20,11 @@ import (
 	"context"
 
 	"coralogix-operator-poc/controllers/clientset"
-	rulesgroups "coralogix-operator-poc/controllers/clientset/grpc/rules-groups/v1"
+	alerts "coralogix-operator-poc/controllers/clientset/grpc/alerts/v1"
 	"github.com/golang/protobuf/jsonpb"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -31,40 +33,41 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	coralogixv1 "coralogix-operator-poc/api/v1"
-	"google.golang.org/grpc/status"
 )
 
-// RuleGroupReconciler reconciles a RuleGroup object
-type RuleGroupReconciler struct {
+// AlertReconciler reconciles a Alert object
+type AlertReconciler struct {
 	client.Client
 	CoralogixClientSet *clientset.ClientSet
 	Scheme             *runtime.Scheme
 }
 
-//+kubebuilder:rbac:groups=coralogix.coralogix,resources=rulegroups,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=coralogix.coralogix,resources=rulegroups/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=coralogix.coralogix,resources=rulegroups/finalizers,verbs=update
+//+kubebuilder:rbac:groups=coralogix.coralogix,resources=alerts,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=coralogix.coralogix,resources=alerts/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=coralogix.coralogix,resources=alerts/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 // TODO(user): Modify the Reconcile function to compare the state specified by
-// the RuleGroup object against the actual cluster state, and then
+// the Alert object against the actual cluster state, and then
 // perform operations to make the cluster state reflect the state specified by
 // the user.
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.13.0/pkg/reconcile
-func (r *RuleGroupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *AlertReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	_ = log.FromContext(ctx)
+
 	log := log.FromContext(ctx)
 	jsm := &jsonpb.Marshaler{
 		//Indent: "\t",
 	}
-	rulesGroupsClient := r.CoralogixClientSet.RuleGroups()
+	alertsClient := r.CoralogixClientSet.Alerts()
 
-	//Get ruleGroupCRD
-	ruleGroupCRD := &coralogixv1.RuleGroup{}
+	//Get alertCRD
+	alertCRD := &coralogixv1.Alert{}
 
-	if err := r.Client.Get(ctx, req.NamespacedName, ruleGroupCRD); err != nil {
+	if err := r.Client.Get(ctx, req.NamespacedName, alertCRD); err != nil {
 		if errors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
 			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
@@ -79,40 +82,46 @@ func (r *RuleGroupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	myFinalizerName := "batch.tutorial.kubebuilder.io/finalizer"
 
 	// examine DeletionTimestamp to determine if object is under deletion
-	if ruleGroupCRD.ObjectMeta.DeletionTimestamp.IsZero() {
+	if alertCRD.ObjectMeta.DeletionTimestamp.IsZero() {
 		// The object is not being deleted, so if it does not have our finalizer,
 		// then lets add the finalizer and update the object. This is equivalent
 		// registering our finalizer.
-		if !controllerutil.ContainsFinalizer(ruleGroupCRD, myFinalizerName) {
-			controllerutil.AddFinalizer(ruleGroupCRD, myFinalizerName)
-			if err := r.Update(ctx, ruleGroupCRD); err != nil {
+		if !controllerutil.ContainsFinalizer(alertCRD, myFinalizerName) {
+			controllerutil.AddFinalizer(alertCRD, myFinalizerName)
+			if err := r.Update(ctx, alertCRD); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
 	} else {
 		// The object is being deleted
-		if controllerutil.ContainsFinalizer(ruleGroupCRD, myFinalizerName) {
+		if controllerutil.ContainsFinalizer(alertCRD, myFinalizerName) {
 			// our finalizer is present, so lets handle any external dependency
-			if ruleGroupCRD.Status.ID == nil {
-				controllerutil.RemoveFinalizer(ruleGroupCRD, myFinalizerName)
-				err := r.Update(ctx, ruleGroupCRD)
+			if alertCRD.Status.ID == nil {
+				controllerutil.RemoveFinalizer(alertCRD, myFinalizerName)
+				err := r.Update(ctx, alertCRD)
 				return ctrl.Result{}, err
 			}
 
-			ruleGroupId := *ruleGroupCRD.Status.ID
-			deleteRuleGroupReq := &rulesgroups.DeleteRuleGroupRequest{GroupId: ruleGroupId}
-			log.V(1).Info("Deleting Rule-Group", "Rule-Group ID", ruleGroupId)
-			if _, err := rulesGroupsClient.DeleteRuleGroup(ctx, deleteRuleGroupReq); err != nil {
+			alertId := *alertCRD.Status.ID
+			deleteAlertReq := &alerts.DeleteAlertByUniqueIdRequest{Id: wrapperspb.String(alertId)}
+			log.V(1).Info("Deleting Alert", "Alert ID", alertId)
+			if _, err := alertsClient.DeleteAlert(ctx, deleteAlertReq); err != nil {
 				// if fail to delete the external dependency here, return with error
 				// so that it can be retried
-				log.Error(err, "Received an error while Deleting a Rule-Group", "Rule-Group ID", ruleGroupId)
+				if status.Code(err) == codes.NotFound {
+					controllerutil.RemoveFinalizer(alertCRD, myFinalizerName)
+					err := r.Update(ctx, alertCRD)
+					return ctrl.Result{}, err
+				}
+
+				log.Error(err, "Received an error while Deleting a Alert", "Alert ID", alertId)
 				return ctrl.Result{}, err
 			}
 
-			log.V(1).Info("Rule-Group was deleted", "Rule-Group ID", ruleGroupId)
+			log.V(1).Info("Alert was deleted", "Alert ID", alertId)
 			// remove our finalizer from the list and update it.
-			controllerutil.RemoveFinalizer(ruleGroupCRD, myFinalizerName)
-			if err := r.Update(ctx, ruleGroupCRD); err != nil {
+			controllerutil.RemoveFinalizer(alertCRD, myFinalizerName)
+			if err := r.Update(ctx, alertCRD); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
@@ -123,52 +132,52 @@ func (r *RuleGroupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	var notFount bool
 	var err error
-	var actualState *rulesgroups.GetRuleGroupResponse
-	if ruleGroupCRD.Status.ID == nil {
+	var actualState *alerts.GetAlertByUniqueIdResponse
+	if alertCRD.Status.ID == nil {
 		notFount = true
-	} else if actualState, err = rulesGroupsClient.GetRuleGroup(ctx,
-		&rulesgroups.GetRuleGroupRequest{GroupId: *ruleGroupCRD.Status.ID}); status.Code(err) == codes.NotFound {
+	} else if actualState, err = alertsClient.GetAlert(ctx,
+		&alerts.GetAlertByUniqueIdRequest{Id: wrapperspb.String(*alertCRD.Status.ID)}); status.Code(err) == codes.NotFound {
 		notFount = true
 	}
 
 	if notFount {
-		createRuleGroupReq := ruleGroupCRD.Spec.ExtractCreateRuleGroupRequest()
-		jstr, _ := jsm.MarshalToString(createRuleGroupReq)
-		log.V(1).Info("Creating Rule-Group", "ruleGroup", jstr)
-		if createRuleGroupResp, err := rulesGroupsClient.CreateRuleGroup(ctx, createRuleGroupReq); err == nil {
-			jstr, _ := jsm.MarshalToString(createRuleGroupResp)
-			log.V(1).Info("Rule-Group was updated", "ruleGroup", jstr)
-			ruleGroupCRD.Status.ID = new(string)
-			*ruleGroupCRD.Status.ID = createRuleGroupResp.GetRuleGroup().GetId().GetValue()
-			r.Status().Update(ctx, ruleGroupCRD)
+		createAlertReq := alertCRD.Spec.ExtractCreateAlertRequest()
+		jstr, _ := jsm.MarshalToString(createAlertReq)
+		log.V(1).Info("Creating Alert", "alert", jstr)
+		if createAlertResp, err := alertsClient.CreateAlert(ctx, createAlertReq); err == nil {
+			jstr, _ := jsm.MarshalToString(createAlertResp)
+			log.V(1).Info("Alert was created", "alert", jstr)
+			alertCRD.Status.ID = new(string)
+			*alertCRD.Status.ID = createAlertResp.GetAlert().GetUniqueIdentifier().GetValue()
+			r.Status().Update(ctx, alertCRD)
 			return ctrl.Result{RequeueAfter: defaultRequeuePeriod}, nil
 		} else {
-			log.Error(err, "Received an error while creating a Rule-Group", "ruleGroup", createRuleGroupReq)
+			log.Error(err, "Received an error while creating a Alert", "alert", createAlertResp)
 			return ctrl.Result{RequeueAfter: defaultErrRequeuePeriod}, err
 		}
 	} else if err != nil {
-		log.Error(err, "Received an error while reading a Rule-Group", "ruleGroup ID", *ruleGroupCRD.Status.ID)
+		log.Error(err, "Received an error while reading a Alert", "alert ID", *alertCRD.Status.ID)
 		return ctrl.Result{RequeueAfter: defaultErrRequeuePeriod}, err
 	}
 
-	if equal, diff := ruleGroupCRD.Spec.DeepEqual(actualState.RuleGroup); !equal {
+	if equal, diff := alertCRD.Spec.DeepEqual(actualState.GetAlert()); !equal {
 		log.V(1).Info("Find diffs between spec and the actual state", "Diff", diff)
-		updateRuleGroupReq := ruleGroupCRD.Spec.ExtractUpdateRuleGroupRequest(*ruleGroupCRD.Status.ID)
-		updateRuleGroupResp, err := rulesGroupsClient.UpdateRuleGroup(ctx, updateRuleGroupReq)
+		updateAlertReq := alertCRD.Spec.ExtractUpdateAlertRequest(*alertCRD.Status.ID)
+		updateAlertResp, err := alertsClient.UpdateAlert(ctx, updateAlertReq)
 		if err != nil {
-			log.Error(err, "Received an error while updating a Rule-Group", "ruleGroup", updateRuleGroupReq)
+			log.Error(err, "Received an error while updating a Alert", "alert", updateAlertReq)
 			return ctrl.Result{RequeueAfter: defaultErrRequeuePeriod}, err
 		}
-		jstr, _ := jsm.MarshalToString(updateRuleGroupResp)
-		log.V(1).Info("Rule-Group was updated", "ruleGroup", jstr)
+		jstr, _ := jsm.MarshalToString(updateAlertResp)
+		log.V(1).Info("Alert was updated", "alert", jstr)
 	}
 
 	return ctrl.Result{RequeueAfter: defaultRequeuePeriod}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *RuleGroupReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *AlertReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&coralogixv1.RuleGroup{}).
+		For(&coralogixv1.Alert{}).
 		Complete(r)
 }
