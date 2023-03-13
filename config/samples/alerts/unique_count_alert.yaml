@@ -1,0 +1,34 @@
+apiVersion: coralogix.coralogix/v1
+kind: Alert
+metadata:
+  labels:
+    app.kubernetes.io/name: alert
+    app.kubernetes.io/instance: alert-sample
+    app.kubernetes.io/part-of: coralogix-operator-poc
+    app.kuberentes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: coralogix-operator-poc
+  name: unique-count-alert-example
+spec:
+  name: unique-count alert example
+  description: alert from k8s operator
+  severity: Critical
+  notifications:
+    recipients:
+      emails: [ "user@example.com" ]
+      webhooks: [ "WebhookAlerts" ]
+    notifyEveryMin: 10
+  scheduling:
+    daysEnabled: [ "Wednesday", "Thursday" ]
+    timeZone : UTC+02
+    startTime: 08:30
+    endTime: 20:30
+  alertType:
+    uniqueCount:
+      filters:
+        severities: ["Error"]
+      conditions:
+        key: remote_addr_geoip.country_name
+        maxUniqueValues: 2
+        timeWindow: TenMinutes
+        groupBy: EventType
+        maxUniqueValuesForGroupBy: 500

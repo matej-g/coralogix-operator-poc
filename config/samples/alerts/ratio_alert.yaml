@@ -20,6 +20,7 @@ spec:
     notifyOnlyOnTriggeredGroupByValues: true
   scheduling:
     daysEnabled: [ "Wednesday", "Thursday" ]
+    timeZone : UTC+02
     startTime: 08:30
     endTime: 20:30
   alertType:
