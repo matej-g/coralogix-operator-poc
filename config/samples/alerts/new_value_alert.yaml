@@ -7,28 +7,25 @@ metadata:
     app.kubernetes.io/part-of: coralogix-operator-poc
     app.kuberentes.io/managed-by: kustomize
     app.kubernetes.io/created-by: coralogix-operator-poc
-  name: promql-alert-example
+  name: new-value-alert-example
 spec:
-  name: promql alert example
+  name: new-value alert example
   description: alert from k8s operator
   severity: Critical
   notifications:
     recipients:
       emails: [ "user@example.com" ]
       webhooks: [ "WebhookAlerts" ]
-    notifyEveryMin: 720
+    notifyEveryMin: 10
   scheduling:
     daysEnabled: [ "Wednesday", "Thursday" ]
-    timeZone: UTC+02
+    timeZone : UTC+02
     startTime: 08:30
     endTime: 20:30
   alertType:
-    metric:
-      promql:
-        searchQuery: http_requests_total{status!~\"4..\"}
-        conditions:
-          alertWhen: More
-          threshold: 3
-          sampleThresholdPercentage: 50
-          timeWindow: TwelveHours
-          minNonNullValuesPercentage: 10
+    newValue:
+      filters:
+        severities: ["Error"]
+      conditions:
+        key: remote_addr_geoip.country_name
+        timeWindow: "TwelveHours"

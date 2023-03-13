@@ -22,6 +22,7 @@ spec:
     notifyEveryMin: 10
   scheduling:
     daysEnabled: [ "Wednesday", "Thursday" ]
+    timeZone: UTC+02
     startTime: 08:00
     endTime: 20:00
   alertType:
