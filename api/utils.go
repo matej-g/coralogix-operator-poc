@@ -1,6 +1,12 @@
 package api
 
-import "google.golang.org/protobuf/types/known/wrapperspb"
+import (
+	"fmt"
+	"reflect"
+
+	"google.golang.org/protobuf/types/known/wrapperspb"
+	"k8s.io/apimachinery/pkg/api/resource"
+)
 
 type Diff struct {
 	Name            string
@@ -56,4 +62,15 @@ func WrappedStringSliceToStringSlice(arr []*wrapperspb.StringValue) []string {
 		result = append(result, s.Value)
 	}
 	return result
+}
+
+func FloatToQuantity(n float64) resource.Quantity {
+	return resource.MustParse(fmt.Sprintf("%f", n))
+}
+
+func PointerToString(pointer any) string {
+	if pointer == nil {
+		return "nil"
+	}
+	return fmt.Sprint(reflect.ValueOf(pointer))
 }

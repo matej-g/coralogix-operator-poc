@@ -17,7 +17,6 @@ spec:
       emails: [ "user@example.com" ]
       webhooks: [ "WebhookAlerts" ]
     notifyEveryMin: 10
-    notifyOnlyOnTriggeredGroupByValues: true
   scheduling:
     daysEnabled: [ "Wednesday", "Thursday" ]
     timeZone : UTC+02
