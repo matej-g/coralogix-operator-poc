@@ -115,7 +115,6 @@ var (
 	}
 	msInHour   = int(time.Hour.Milliseconds())
 	msInMinute = int(time.Minute.Milliseconds())
-	msInSecond = int(time.Second.Milliseconds())
 )
 
 type protoTimeFrameAndRelativeTimeFrame struct {
@@ -229,12 +228,12 @@ func expandRatio(ratio *Ratio, notifyWhenResolved, notifyOnlyOnTriggeredGroupByV
 	groupBy := utils.StringSliceToWrappedStringSlice(ratio.Conditions.GroupBy)
 	var groupByQ1, groupByQ2 []*wrapperspb.StringValue
 	if groupByFor := ratio.Conditions.GroupByFor; groupByFor != nil {
-		switch string(*groupByFor) {
-		case "Q1":
+		switch *groupByFor {
+		case GroupByForQ1:
 			groupByQ1 = groupBy
-		case "Q2":
+		case GroupByForQ2:
 			groupByQ2 = groupBy
-		case "Both":
+		case GroupByForBoth:
 			groupByQ1 = groupBy
 			groupByQ2 = groupBy
 		}
@@ -527,7 +526,7 @@ func expandLuceneCondition(conditions *LuceneConditions, notifyWhenResolved, not
 	}
 	sampleThresholdPercentage := wrapperspb.UInt32(uint32(conditions.SampleThresholdPercentage))
 	swapNullValues := wrapperspb.Bool(conditions.ReplaceMissingValueWithZero)
-	nonNullPercentage := wrapperspb.UInt32(uint32(*conditions.MinNonNullValuesPercentage))
+	nonNullPercentage := wrapperspb.UInt32(uint32(conditions.MinNonNullValuesPercentage))
 
 	luceneParams := &alerts.MetricAlertConditionParameters{
 		MetricSource:               alerts.MetricAlertConditionParameters_METRIC_SOURCE_LOGS2METRICS_OR_UNSPECIFIED,
@@ -720,7 +719,6 @@ func expandFlowStage(stage FlowStage) *alerts.FlowStage {
 func expandTimeToMS(t FlowStageTimeFrame) int {
 	timeMS := msInHour * t.Hours
 	timeMS += msInMinute * t.Minutes
-	timeMS += msInSecond * t.Seconds
 
 	return timeMS
 }
@@ -1181,7 +1179,7 @@ type Notifications struct {
 func (in *Notifications) DeepEqual(actualNotifications *Notifications) (bool, utils.Diff) {
 	if equal, diff := in.Recipients.DeepEqual(actualNotifications.Recipients); !equal {
 		return false, utils.Diff{
-			Name:    "Recipients",
+			Name:    fmt.Sprintf("Recipients.%s", diff.Name),
 			Desired: diff.Desired,
 			Actual:  diff.Actual,
 		}
@@ -1239,7 +1237,7 @@ func (in *Recipients) DeepEqual(actualRecipients Recipients) (bool, utils.Diff) 
 		}
 	}
 
-	return false, utils.Diff{}
+	return true, utils.Diff{}
 }
 
 type Scheduling struct {
@@ -1262,7 +1260,7 @@ func (in *Scheduling) DeepEqual(scheduling Scheduling) (bool, utils.Diff) {
 		}
 	}
 
-	if utils.SlicesWithUniqueValuesEqual(in.DaysEnabled, scheduling.DaysEnabled) {
+	if !utils.SlicesWithUniqueValuesEqual(in.DaysEnabled, scheduling.DaysEnabled) {
 		return false, utils.Diff{
 			Name:    "DaysEnabled",
 			Desired: in.DaysEnabled,
@@ -1273,16 +1271,16 @@ func (in *Scheduling) DeepEqual(scheduling Scheduling) (bool, utils.Diff) {
 	if !reflect.DeepEqual(in.StartTime, scheduling.StartTime) {
 		return false, utils.Diff{
 			Name:    "StartTime",
-			Desired: utils.PointerToString(in.TimeZone),
-			Actual:  utils.PointerToString(scheduling.TimeZone),
+			Desired: string(*in.StartTime),
+			Actual:  string(*scheduling.StartTime),
 		}
 	}
 
 	if !reflect.DeepEqual(in.EndTime, scheduling.EndTime) {
 		return false, utils.Diff{
-			Name:    "StartTime",
-			Desired: utils.PointerToString(in.TimeZone),
-			Actual:  utils.PointerToString(scheduling.TimeZone),
+			Name:    "EndTime",
+			Desired: utils.PointerToString(in.EndTime),
+			Actual:  utils.PointerToString(scheduling.EndTime),
 		}
 	}
 
@@ -1329,7 +1327,7 @@ func DeepEqualTimeRanges(timeRange, actualTimeRange *alerts.TimeRange) (bool, ut
 }
 
 func DeepEqualTimes(time, actualTime *alerts.Time) (bool, utils.Diff) {
-	if time.GetHours() != actualTime.GetHours() || time.GetMinutes() != actualTime.GetMinutes() || time.GetSeconds() != actualTime.GetSeconds() {
+	if time.GetHours() != actualTime.GetHours() || time.GetMinutes() != actualTime.GetMinutes() {
 		return false, utils.Diff{
 			Name:    "Hour",
 			Desired: time.String(),
@@ -1708,7 +1706,7 @@ func (in *Metric) DeepEqual(actualMetric Metric) (bool, utils.Diff) {
 		}
 	}
 
-	return false, utils.Diff{}
+	return true, utils.Diff{}
 }
 
 type Lucene struct {
@@ -1857,15 +1855,9 @@ func (in *StandardConditions) DeepEqual(actualCondition StandardConditions) (boo
 		}
 	}
 
-	if manageUndetectedValues, actualManageUndetectedValues := in.ManageUndetectedValues, actualCondition.ManageUndetectedValues; manageUndetectedValues == nil && actualManageUndetectedValues != nil {
+	if equal, diff := in.ManageUndetectedValues.DeepEqual(actualCondition.ManageUndetectedValues); !equal {
 		return false, utils.Diff{
-			Name:    "ManageUndetectedValues",
-			Desired: utils.PointerToString(manageUndetectedValues),
-			Actual:  utils.PointerToString(actualManageUndetectedValues),
-		}
-	} else if equal, diff := manageUndetectedValues.DeepEqual(actualManageUndetectedValues); !equal {
-		return false, utils.Diff{
-			Name:    fmt.Sprintf("ManageUndetectedValues.%s", diff.Name),
+			Name:    diff.Name,
 			Desired: diff.Desired,
 			Actual:  diff.Actual,
 		}
@@ -1911,21 +1903,15 @@ func (in *RatioConditions) DeepEqual(actualCondition RatioConditions) (bool, uti
 		}
 	}
 
-	if manageUndetectedValues, actualManageUndetectedValues := in.ManageUndetectedValues, actualCondition.ManageUndetectedValues; manageUndetectedValues == nil && actualManageUndetectedValues != nil {
+	if equal, diff := in.ManageUndetectedValues.DeepEqual(actualCondition.ManageUndetectedValues); !equal {
 		return false, utils.Diff{
-			Name:    "ManageUndetectedValues",
-			Desired: utils.PointerToString(manageUndetectedValues),
-			Actual:  utils.PointerToString(actualManageUndetectedValues),
-		}
-	} else if equal, diff := manageUndetectedValues.DeepEqual(actualManageUndetectedValues); !equal {
-		return false, utils.Diff{
-			Name:    fmt.Sprintf("ManageUndetectedValues.%s", diff.Name),
+			Name:    diff.Name,
 			Desired: diff.Desired,
 			Actual:  diff.Actual,
 		}
 	}
 
-	if in.Ratio != actualCondition.Ratio {
+	if !in.Ratio.Equal(actualCondition.Ratio) {
 		return false, utils.Diff{
 			Name:    "Ratio",
 			Desired: in.Ratio,
@@ -2061,21 +2047,15 @@ func (in *TimeRelativeConditions) DeepEqual(actualCondition TimeRelativeConditio
 		}
 	}
 
-	if manageUndetectedValues, actualManageUndetectedValues := in.ManageUndetectedValues, actualCondition.ManageUndetectedValues; manageUndetectedValues == nil && actualManageUndetectedValues != nil {
+	if equal, diff := in.ManageUndetectedValues.DeepEqual(actualCondition.ManageUndetectedValues); !equal {
 		return false, utils.Diff{
-			Name:    "ManageUndetectedValues",
-			Desired: utils.PointerToString(manageUndetectedValues),
-			Actual:  utils.PointerToString(actualManageUndetectedValues),
-		}
-	} else if equal, diff := manageUndetectedValues.DeepEqual(actualManageUndetectedValues); !equal {
-		return false, utils.Diff{
-			Name:    fmt.Sprintf("ManageUndetectedValues.%s", diff.Name),
+			Name:    diff.Name,
 			Desired: diff.Desired,
 			Actual:  diff.Actual,
 		}
 	}
 
-	if in.Threshold != actualCondition.Threshold {
+	if !in.Threshold.Equal(actualCondition.Threshold) {
 		return false, utils.Diff{
 			Name:    "Threshold",
 			Desired: in.Threshold,
@@ -2140,14 +2120,14 @@ type LuceneConditions struct {
 
 	// +kubebuilder:validation:Minimum:=0
 	// +kubebuilder:validation:MultipleOf:=10
-	MinNonNullValuesPercentage *int `json:"minNonNullValuesPercentage,omitempty"`
+	MinNonNullValuesPercentage int `json:"minNonNullValuesPercentage,omitempty"`
 
 	// +optional
 	ManageUndetectedValues *ManageUndetectedValues `json:"manageUndetectedValues,omitempty"`
 }
 
 func (in *LuceneConditions) DeepEqual(actualCondition LuceneConditions) (bool, utils.Diff) {
-	if in.Threshold != actualCondition.Threshold {
+	if !in.Threshold.Equal(actualCondition.Threshold) {
 		return false, utils.Diff{
 			Name:    "Threshold",
 			Desired: in.Threshold,
@@ -2187,7 +2167,7 @@ func (in *LuceneConditions) DeepEqual(actualCondition LuceneConditions) (bool, u
 		}
 	}
 
-	if reflect.DeepEqual(in.ArithmeticOperatorModifier, actualCondition.ArithmeticOperatorModifier) {
+	if !reflect.DeepEqual(in.ArithmeticOperatorModifier, actualCondition.ArithmeticOperatorModifier) {
 		return false, utils.Diff{
 			Name:    "ArithmeticOperatorModifier",
 			Desired: utils.PointerToString(in.ArithmeticOperatorModifier),
@@ -2219,15 +2199,9 @@ func (in *LuceneConditions) DeepEqual(actualCondition LuceneConditions) (bool, u
 		}
 	}
 
-	if manageUndetectedValues, actualManageUndetectedValues := in.ManageUndetectedValues, actualCondition.ManageUndetectedValues; manageUndetectedValues == nil && actualManageUndetectedValues != nil {
+	if equal, diff := in.ManageUndetectedValues.DeepEqual(actualCondition.ManageUndetectedValues); !equal {
 		return false, utils.Diff{
-			Name:    "ManageUndetectedValues",
-			Desired: utils.PointerToString(manageUndetectedValues),
-			Actual:  utils.PointerToString(actualManageUndetectedValues),
-		}
-	} else if equal, diff := manageUndetectedValues.DeepEqual(actualManageUndetectedValues); !equal {
-		return false, utils.Diff{
-			Name:    fmt.Sprintf("ManageUndetectedValues.%s", diff.Name),
+			Name:    diff.Name,
 			Desired: diff.Desired,
 			Actual:  diff.Actual,
 		}
@@ -2261,56 +2235,50 @@ type PromqlConditions struct {
 	ManageUndetectedValues *ManageUndetectedValues `json:"manageUndetectedValues,omitempty"`
 }
 
-func (in *PromqlConditions) DeepEqual(actualConditions PromqlConditions) (bool, utils.Diff) {
-	if in.Threshold != actualConditions.Threshold {
+func (in *PromqlConditions) DeepEqual(actualCondition PromqlConditions) (bool, utils.Diff) {
+	if !in.Threshold.Equal(actualCondition.Threshold) {
 		return false, utils.Diff{
 			Name:    "Threshold",
 			Desired: in.Threshold,
-			Actual:  actualConditions.Threshold,
+			Actual:  actualCondition.Threshold,
 		}
 	}
 
-	if !utils.SlicesWithUniqueValuesEqual(in.GroupBy, actualConditions.GroupBy) {
+	if !utils.SlicesWithUniqueValuesEqual(in.GroupBy, actualCondition.GroupBy) {
 		return false, utils.Diff{
 			Name:    "GroupBy",
 			Desired: in.GroupBy,
-			Actual:  actualConditions.GroupBy,
+			Actual:  actualCondition.GroupBy,
 		}
 	}
 
-	if in.TimeWindow != actualConditions.TimeWindow {
+	if in.TimeWindow != actualCondition.TimeWindow {
 		return false, utils.Diff{
 			Name:    "TimeWindow",
 			Desired: in.TimeWindow,
-			Actual:  actualConditions.TimeWindow,
+			Actual:  actualCondition.TimeWindow,
 		}
 	}
 
-	if in.SampleThresholdPercentage != actualConditions.SampleThresholdPercentage {
+	if in.SampleThresholdPercentage != actualCondition.SampleThresholdPercentage {
 		return false, utils.Diff{
 			Name:    "SampleThresholdPercentage",
 			Desired: in.SampleThresholdPercentage,
-			Actual:  actualConditions.SampleThresholdPercentage,
+			Actual:  actualCondition.SampleThresholdPercentage,
 		}
 	}
 
-	if !reflect.DeepEqual(in.MinNonNullValuesPercentage, actualConditions.MinNonNullValuesPercentage) {
+	if !reflect.DeepEqual(in.MinNonNullValuesPercentage, actualCondition.MinNonNullValuesPercentage) {
 		return false, utils.Diff{
 			Name:    "MinNonNullValuesPercentage",
 			Desired: utils.PointerToString(in.MinNonNullValuesPercentage),
-			Actual:  utils.PointerToString(actualConditions.MinNonNullValuesPercentage),
+			Actual:  utils.PointerToString(actualCondition.MinNonNullValuesPercentage),
 		}
 	}
 
-	if manageUndetectedValues, actualManageUndetectedValues := in.ManageUndetectedValues, actualConditions.ManageUndetectedValues; manageUndetectedValues == nil && actualManageUndetectedValues != nil {
+	if equal, diff := in.ManageUndetectedValues.DeepEqual(actualCondition.ManageUndetectedValues); !equal {
 		return false, utils.Diff{
-			Name:    "ManageUndetectedValues",
-			Desired: utils.PointerToString(manageUndetectedValues),
-			Actual:  utils.PointerToString(actualManageUndetectedValues),
-		}
-	} else if equal, diff := manageUndetectedValues.DeepEqual(actualManageUndetectedValues); !equal {
-		return false, utils.Diff{
-			Name:    fmt.Sprintf("ManageUndetectedValues.%s", diff.Name),
+			Name:    diff.Name,
 			Desired: diff.Desired,
 			Actual:  diff.Actual,
 		}
@@ -2340,6 +2308,7 @@ func (in *TracingCondition) DeepEqual(actualCondition TracingCondition) (bool, u
 			Actual:  actualCondition.AlertWhen,
 		}
 	}
+
 	if !reflect.DeepEqual(in.Threshold, actualCondition.Threshold) {
 		return false, utils.Diff{
 			Name:    "Threshold",
@@ -2347,6 +2316,7 @@ func (in *TracingCondition) DeepEqual(actualCondition TracingCondition) (bool, u
 			Actual:  utils.PointerToString(actualCondition.Threshold),
 		}
 	}
+
 	if !reflect.DeepEqual(in.TimeWindow, actualCondition.TimeWindow) {
 		return false, utils.Diff{
 			Name:    "TimeWindow",
@@ -2408,6 +2378,12 @@ const (
 
 // +kubebuilder:validation:Enum=Q1;Q2;Both
 type GroupByFor string
+
+const (
+	GroupByForQ1   GroupByFor = "Q1"
+	GroupByForQ2   GroupByFor = "Q2"
+	GroupByForBoth GroupByFor = "Both"
+)
 
 // +kubebuilder:validation:Enum=FiveMinutes;TenMinutes;FifteenMinutes;TwentyMinutes;ThirtyMinutes;Hour;TwoHours;FourHours;SixHours;TwelveHours;TwentyFourHours;ThirtySixHours
 type TimeWindow string
@@ -2474,7 +2450,7 @@ func (in *Filters) DeepEqual(actualFilters *Filters) (bool, utils.Diff) {
 		}
 	}
 
-	if !reflect.DeepEqual(in.Alias, actualFilters.Alias) {
+	if alias, actualAlias := in.Alias, actualFilters.Alias; !(alias == nil && actualAlias == nil || *actualAlias == "") && reflect.DeepEqual(alias, actualAlias) {
 		return false, utils.Diff{
 			Name:    "Alias",
 			Desired: utils.PointerToString(in.Alias),
@@ -2622,7 +2598,7 @@ type TracingFilters struct {
 }
 
 func (in *TracingFilters) DeepEqual(actualFilters TracingFilters) (bool, utils.Diff) {
-	if in.LatencyThresholdMilliseconds != actualFilters.LatencyThresholdMilliseconds {
+	if !in.LatencyThresholdMilliseconds.Equal(actualFilters.LatencyThresholdMilliseconds) {
 		return false, utils.Diff{
 			Name:    "LatencyThresholdMilliseconds",
 			Desired: in.LatencyThresholdMilliseconds,
@@ -2750,13 +2726,32 @@ type ManageUndetectedValues struct {
 }
 
 func (in *ManageUndetectedValues) DeepEqual(actualManageUndetectedValues *ManageUndetectedValues) (bool, utils.Diff) {
-	if actualManageUndetectedValues == nil {
-		return false, utils.Diff{}
+	if in == nil {
+		if actualManageUndetectedValues == nil {
+			return true, utils.Diff{}
+		}
+
+		if actualManageUndetectedValues.EnableTriggeringOnUndetectedValues == true && *actualManageUndetectedValues.AutoRetireRatio == AutoRetireRatioNever {
+			return true, utils.Diff{}
+		} else {
+			return false, utils.Diff{
+				Name:    "ManageUndetectedValues",
+				Desired: utils.PointerToString(in),
+				Actual:  utils.PointerToString(actualManageUndetectedValues),
+			}
+		}
+
+	} else if actualManageUndetectedValues == nil {
+		return false, utils.Diff{
+			Name:    "ManageUndetectedValues",
+			Desired: utils.PointerToString(in),
+			Actual:  utils.PointerToString(actualManageUndetectedValues),
+		}
 	}
 
 	if in.EnableTriggeringOnUndetectedValues != actualManageUndetectedValues.EnableTriggeringOnUndetectedValues {
 		return false, utils.Diff{
-			Name:    "EnableTriggeringOnUndetectedValues",
+			Name:    "ManageUndetectedValues.EnableTriggeringOnUndetectedValues",
 			Desired: in.EnableTriggeringOnUndetectedValues,
 			Actual:  actualManageUndetectedValues.EnableTriggeringOnUndetectedValues,
 		}
@@ -2764,7 +2759,7 @@ func (in *ManageUndetectedValues) DeepEqual(actualManageUndetectedValues *Manage
 
 	if !reflect.DeepEqual(in.AutoRetireRatio, actualManageUndetectedValues.AutoRetireRatio) {
 		return false, utils.Diff{
-			Name:    "AutoRetireRatio",
+			Name:    "ManageUndetectedValues.AutoRetireRatio",
 			Desired: utils.PointerToString(in.AutoRetireRatio),
 			Actual:  utils.PointerToString(actualManageUndetectedValues.AutoRetireRatio),
 		}
@@ -2865,7 +2860,7 @@ func (in *InnerFlowAlerts) DeepEqual(actualInnerFlowAlerts InnerFlowAlerts) (boo
 			}
 		}
 	}
-	return false, utils.Diff{}
+	return true, utils.Diff{}
 }
 
 type InnerFlowAlerts struct {
@@ -2883,7 +2878,7 @@ type InnerFlowAlert struct {
 }
 
 func (in *InnerFlowAlert) DeepEqual(actualInnerFlowAlert InnerFlowAlert) (bool, utils.Diff) {
-	if in.Not == actualInnerFlowAlert.Not {
+	if in.Not != actualInnerFlowAlert.Not {
 		return false, utils.Diff{
 			Name:    "Not",
 			Desired: in.Not,

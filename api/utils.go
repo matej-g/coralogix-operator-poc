@@ -68,9 +68,46 @@ func FloatToQuantity(n float64) resource.Quantity {
 	return resource.MustParse(fmt.Sprintf("%f", n))
 }
 
-func PointerToString(pointer any) string {
-	if pointer == nil {
-		return "nil"
+func PointerToString(o any) string {
+	val := reflect.ValueOf(o)
+	if val.IsNil() {
+		return "<nil>"
 	}
-	return fmt.Sprint(reflect.ValueOf(pointer))
+
+	if val.Kind() == reflect.Interface {
+		elm := val.Elem()
+		if elm.Kind() == reflect.Ptr && !elm.IsNil() && elm.Elem().Kind() == reflect.Ptr {
+			val = elm
+		}
+	}
+	if val.Kind() == reflect.Ptr {
+		val = val.Elem()
+	}
+
+	if val.Kind() != reflect.Struct {
+		return val.String()
+	}
+
+	result := ""
+	for i := 0; i < val.NumField(); i++ {
+		valueField := val.Field(i)
+		typeField := val.Type().Field(i)
+		if valueField.Kind() == reflect.Interface && !valueField.IsNil() {
+			elm := valueField.Elem()
+			if elm.Kind() == reflect.Ptr && !elm.IsNil() && elm.Elem().Kind() == reflect.Ptr {
+				valueField = elm
+			}
+		}
+		if valueField.Kind() == reflect.Ptr {
+			valueField = valueField.Elem()
+		}
+
+		if valueField.Kind() == reflect.Struct {
+			result += PointerToString(valueField.Interface())
+		} else {
+			result = fmt.Sprintf("Field Name: %s,\t Field Value: %v\n", typeField.Name, valueField.Interface())
+		}
+	}
+
+	return result
 }

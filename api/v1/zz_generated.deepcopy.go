@@ -535,11 +535,6 @@ func (in *LuceneConditions) DeepCopyInto(out *LuceneConditions) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
-	if in.MinNonNullValuesPercentage != nil {
-		in, out := &in.MinNonNullValuesPercentage, &out.MinNonNullValuesPercentage
-		*out = new(int)
-		**out = **in
-	}
 	if in.ManageUndetectedValues != nil {
 		in, out := &in.ManageUndetectedValues, &out.ManageUndetectedValues
 		*out = new(ManageUndetectedValues)
