@@ -82,13 +82,13 @@ var (
 		FiltersLogSeverityCritical: alerts.AlertFilters_LOG_SEVERITY_CRITICAL,
 		FiltersLogSeverityError:    alerts.AlertFilters_LOG_SEVERITY_ERROR,
 	}
-	AlertSchemaRelativeTimeFrameToProtoTimeFrameAndRelativeTimeFrame = map[RelativeTimeWindow]protoTimeFrameAndRelativeTimeFrame{
-		RelativeTimeWindowPreviousHour:      {timeFrame: alerts.Timeframe_TIMEFRAME_1_H, relativeTimeFrame: alerts.RelativeTimeframe_RELATIVE_TIMEFRAME_HOUR_OR_UNSPECIFIED},
-		RelativeTimeWindowSameHourYesterday: {timeFrame: alerts.Timeframe_TIMEFRAME_1_H, relativeTimeFrame: alerts.RelativeTimeframe_RELATIVE_TIMEFRAME_DAY},
-		RelativeTimeWindowSameHourLastWeek:  {timeFrame: alerts.Timeframe_TIMEFRAME_1_H, relativeTimeFrame: alerts.RelativeTimeframe_RELATIVE_TIMEFRAME_WEEK},
-		RelativeTimeWindowYesterday:         {timeFrame: alerts.Timeframe_TIMEFRAME_24_H, relativeTimeFrame: alerts.RelativeTimeframe_RELATIVE_TIMEFRAME_DAY},
-		RelativeTimeWindowSameDayLastWeek:   {timeFrame: alerts.Timeframe_TIMEFRAME_24_H, relativeTimeFrame: alerts.RelativeTimeframe_RELATIVE_TIMEFRAME_WEEK},
-		RelativeTimeWindowSameDayLastMonth:  {timeFrame: alerts.Timeframe_TIMEFRAME_24_H, relativeTimeFrame: alerts.RelativeTimeframe_RELATIVE_TIMEFRAME_MONTH},
+	AlertSchemaRelativeTimeFrameToProtoTimeFrameAndRelativeTimeFrame = map[RelativeTimeWindow]ProtoTimeFrameAndRelativeTimeFrame{
+		RelativeTimeWindowPreviousHour:      {TimeFrame: alerts.Timeframe_TIMEFRAME_1_H, RelativeTimeFrame: alerts.RelativeTimeframe_RELATIVE_TIMEFRAME_HOUR_OR_UNSPECIFIED},
+		RelativeTimeWindowSameHourYesterday: {TimeFrame: alerts.Timeframe_TIMEFRAME_1_H, RelativeTimeFrame: alerts.RelativeTimeframe_RELATIVE_TIMEFRAME_DAY},
+		RelativeTimeWindowSameHourLastWeek:  {TimeFrame: alerts.Timeframe_TIMEFRAME_1_H, RelativeTimeFrame: alerts.RelativeTimeframe_RELATIVE_TIMEFRAME_WEEK},
+		RelativeTimeWindowYesterday:         {TimeFrame: alerts.Timeframe_TIMEFRAME_24_H, RelativeTimeFrame: alerts.RelativeTimeframe_RELATIVE_TIMEFRAME_DAY},
+		RelativeTimeWindowSameDayLastWeek:   {TimeFrame: alerts.Timeframe_TIMEFRAME_24_H, RelativeTimeFrame: alerts.RelativeTimeframe_RELATIVE_TIMEFRAME_WEEK},
+		RelativeTimeWindowSameDayLastMonth:  {TimeFrame: alerts.Timeframe_TIMEFRAME_24_H, RelativeTimeFrame: alerts.RelativeTimeframe_RELATIVE_TIMEFRAME_MONTH},
 	}
 	AlertSchemaArithmeticOperatorToProtoArithmeticOperator = map[ArithmeticOperator]alerts.MetricAlertConditionParameters_ArithmeticOperator{
 		ArithmeticOperatorAvg:        alerts.MetricAlertConditionParameters_ARITHMETIC_OPERATOR_AVG_OR_UNSPECIFIED,
@@ -117,9 +117,9 @@ var (
 	msInMinute = int(time.Minute.Milliseconds())
 )
 
-type protoTimeFrameAndRelativeTimeFrame struct {
-	timeFrame         alerts.Timeframe
-	relativeTimeFrame alerts.RelativeTimeframe
+type ProtoTimeFrameAndRelativeTimeFrame struct {
+	TimeFrame         alerts.Timeframe
+	RelativeTimeFrame alerts.RelativeTimeframe
 }
 
 // AlertSpec defines the desired state of Alert
@@ -404,8 +404,8 @@ func expandTimeRelativeCondition(condition *TimeRelativeConditions, notifyWhenRe
 	relatedExtendedData := expandRelatedData(condition.ManageUndetectedValues)
 
 	parameters := &alerts.ConditionParameters{
-		Timeframe:               timeFrameAndRelativeTimeFrame.timeFrame,
-		RelativeTimeframe:       timeFrameAndRelativeTimeFrame.relativeTimeFrame,
+		Timeframe:               timeFrameAndRelativeTimeFrame.TimeFrame,
+		RelativeTimeframe:       timeFrameAndRelativeTimeFrame.RelativeTimeFrame,
 		GroupBy:                 groupBy,
 		Threshold:               threshold,
 		IgnoreInfinity:          ignoreInf,
@@ -1163,10 +1163,10 @@ func (in *ExpirationDate) DeepEqual(date *alerts.Date) bool {
 
 type Notifications struct {
 	//+kubebuilder:default=false
-	OnTriggerAndResolved bool `json:"OnTriggerAndResolved,omitempty"`
+	OnTriggerAndResolved bool `json:"onTriggerAndResolved,omitempty"`
 
 	//+kubebuilder:default=false
-	NotifyOnlyOnTriggeredGroupByValues bool `json:"NotifyOnlyOnTriggeredGroupByValues,omitempty"`
+	NotifyOnlyOnTriggeredGroupByValues bool `json:"notifyOnlyOnTriggeredGroupByValues,omitempty"`
 
 	// +optional
 	Recipients Recipients `json:"recipients,omitempty"`

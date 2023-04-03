@@ -149,12 +149,13 @@ func (r *AlertReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 
 	var notFount bool
 	var err error
-	var actualState coralogixv1.AlertStatus
+	var actualState *coralogixv1.AlertStatus
 
 	if id := alertCRD.Status.ID; id == nil {
+		log.V(1).Info("alert wasn't created")
 		notFount = true
 	} else if getAlertResp, err := alertsClient.GetAlert(ctx, &alerts.GetAlertByUniqueIdRequest{Id: wrapperspb.String(*id)}); status.Code(err) == codes.NotFound {
-		log.V(1).Info("alert doesn't exist on Coralogix backend")
+		log.V(1).Info("alert doesn't exist in Coralogix backend")
 		notFount = true
 	} else if err == nil {
 		actualState = flattenAlert(getAlertResp.GetAlert(), alertCRD.Spec)
@@ -165,13 +166,13 @@ func (r *AlertReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		jstr, _ := jsm.MarshalToString(createAlertReq)
 		log.V(1).Info("Creating Alert", "alert", jstr)
 		if createAlertResp, err := alertsClient.CreateAlert(ctx, createAlertReq); err == nil {
-			jstr, _ := jsm.MarshalToString(createAlertResp)
+			jstr, _ = jsm.MarshalToString(createAlertResp)
 			log.V(1).Info("Alert was created", "alert", jstr)
-			alertResp := createAlertResp.GetAlert()
-			alertCRD.Status.ID = new(string)
-			alertCRD.Status = flattenAlert(alertResp, alertCRD.Spec)
-			*alertCRD.Status.ID = alertResp.GetUniqueIdentifier().GetValue()
-			r.Status().Update(ctx, alertCRD)
+			actualState = flattenAlert(createAlertResp.GetAlert(), alertCRD.Spec)
+			alertCRD.Status = *actualState
+			if err := r.Status().Update(ctx, alertCRD); err != nil {
+				log.V(1).Error(err, "updating crd")
+			}
 			return ctrl.Result{RequeueAfter: defaultRequeuePeriod}, nil
 		} else {
 			log.Error(err, "Received an error while creating Alert", "alert", createAlertResp)
@@ -182,7 +183,7 @@ func (r *AlertReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		return ctrl.Result{RequeueAfter: defaultErrRequeuePeriod}, err
 	}
 
-	if equal, diff := alertCRD.Spec.DeepEqual(&actualState); !equal {
+	if equal, diff := alertCRD.Spec.DeepEqual(actualState); !equal {
 		log.V(1).Info("Find diffs between spec and the actual state", "Diff", diff)
 		updateAlertReq := alertCRD.Spec.ExtractUpdateAlertRequest(*alertCRD.Status.ID)
 		updateAlertResp, err := alertsClient.UpdateAlert(ctx, updateAlertReq)
@@ -197,7 +198,7 @@ func (r *AlertReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	return ctrl.Result{RequeueAfter: defaultRequeuePeriod}, nil
 }
 
-func flattenAlert(actualAlert *alerts.Alert, spec v1.AlertSpec) coralogixv1.AlertStatus {
+func flattenAlert(actualAlert *alerts.Alert, spec v1.AlertSpec) *coralogixv1.AlertStatus {
 	var status coralogixv1.AlertStatus
 
 	status.ID = new(string)
@@ -222,7 +223,7 @@ func flattenAlert(actualAlert *alerts.Alert, spec v1.AlertSpec) coralogixv1.Aler
 
 	status.Notifications = flattenNotifications(actualAlert.GetNotifications(), actualAlert.GetNotifyEvery(), notifyData)
 
-	return status
+	return &status
 }
 
 type NotificationsAlertTypeData struct {
@@ -350,9 +351,9 @@ func flattenStandardCondition(condition *alerts.AlertCondition) (coralogixv1.Sta
 	var standardCondition coralogixv1.StandardConditions
 	var conditionParams *alerts.ConditionParameters
 
-	switch condition.GetCondition().(type) {
+	switch condition := condition.GetCondition().(type) {
 	case *alerts.AlertCondition_LessThan:
-		conditionParams = condition.GetLessThan().GetParameters()
+		conditionParams = condition.LessThan.GetParameters()
 		standardCondition.AlertWhen = coralogixv1.StandardAlertWhenLessThan
 		*standardCondition.Threshold = int(conditionParams.GetThreshold().GetValue())
 		*standardCondition.TimeWindow = coralogixv1.TimeWindow(alertProtoTimeWindowToSchemaTimeWindow[conditionParams.GetTimeframe()])
@@ -372,23 +373,22 @@ func flattenStandardCondition(condition *alerts.AlertCondition) (coralogixv1.Sta
 			}
 		}
 	case *alerts.AlertCondition_MoreThan:
-		conditionParams = condition.GetMoreThan().GetParameters()
+		conditionParams = condition.MoreThan.GetParameters()
 		standardCondition.AlertWhen = coralogixv1.StandardAlertWhenMoreThan
 		standardCondition.Threshold = new(int)
 		*standardCondition.Threshold = int(conditionParams.GetThreshold().GetValue())
 		standardCondition.TimeWindow = new(coralogixv1.TimeWindow)
 		*standardCondition.TimeWindow = coralogixv1.TimeWindow(alertProtoTimeWindowToSchemaTimeWindow[conditionParams.GetTimeframe()])
 	case *alerts.AlertCondition_MoreThanUsual:
-		conditionParams = condition.GetMoreThanUsual().GetParameters()
+		conditionParams = condition.MoreThanUsual.GetParameters()
 		standardCondition.AlertWhen = coralogixv1.StandardAlertWhenMoreThanUsual
 		*standardCondition.Threshold = int(conditionParams.GetThreshold().GetValue())
 	case *alerts.AlertCondition_Immediate:
-		conditionParams = condition.GetMoreThanUsual().GetParameters()
 		standardCondition.AlertWhen = coralogixv1.StandardAlertWhenImmediately
+		return standardCondition, new(NotificationsAlertTypeData)
 	}
 
 	standardCondition.GroupBy = utils.WrappedStringSliceToStringSlice(conditionParams.GetGroupBy())
-
 	notifyData := new(NotificationsAlertTypeData)
 	notifyData.NotifyOnlyOnTriggeredGroupByValues = conditionParams.NotifyGroupByOnlyAlerts
 	notifyData.OnTriggerAndResolved = conditionParams.NotifyOnResolved
@@ -437,9 +437,9 @@ func flattenRatioCondition(condition *alerts.AlertCondition, groupByQ2 []*wrappe
 	var ratioCondition coralogixv1.RatioConditions
 	var conditionParams *alerts.ConditionParameters
 
-	switch condition.GetCondition().(type) {
+	switch condition := condition.GetCondition().(type) {
 	case *alerts.AlertCondition_LessThan:
-		conditionParams = condition.GetLessThan().GetParameters()
+		conditionParams = condition.LessThan.GetParameters()
 		ratioCondition.AlertWhen = coralogixv1.AlertWhenLessThan
 
 		if actualManageUndetectedValues := conditionParams.GetRelatedExtendedData(); actualManageUndetectedValues != nil {
@@ -457,7 +457,7 @@ func flattenRatioCondition(condition *alerts.AlertCondition, groupByQ2 []*wrappe
 			}
 		}
 	case *alerts.AlertCondition_MoreThan:
-		conditionParams = condition.GetLessThan().GetParameters()
+		conditionParams = condition.MoreThan.GetParameters()
 		ratioCondition.AlertWhen = coralogixv1.AlertWhenMoreThan
 	}
 
@@ -535,9 +535,9 @@ func flattenTimeRelativeCondition(condition *alerts.AlertCondition) (coralogixv1
 	var conditionParams *alerts.ConditionParameters
 	var timeRelativeCondition coralogixv1.TimeRelativeConditions
 
-	switch condition.GetCondition().(type) {
+	switch condition := condition.GetCondition().(type) {
 	case *alerts.AlertCondition_LessThan:
-		conditionParams = condition.GetLessThan().GetParameters()
+		conditionParams = condition.LessThan.GetParameters()
 		timeRelativeCondition.AlertWhen = coralogixv1.AlertWhenLessThan
 
 		if actualManageUndetectedValues := conditionParams.GetRelatedExtendedData(); actualManageUndetectedValues != nil {
@@ -555,12 +555,13 @@ func flattenTimeRelativeCondition(condition *alerts.AlertCondition) (coralogixv1
 			}
 		}
 	case *alerts.AlertCondition_MoreThan:
-		conditionParams = condition.GetLessThan().GetParameters()
+		conditionParams = condition.MoreThan.GetParameters()
 		timeRelativeCondition.AlertWhen = coralogixv1.AlertWhenMoreThan
 	}
 
 	timeRelativeCondition.Threshold = utils.FloatToQuantity(conditionParams.GetThreshold().GetValue())
-	timeRelativeCondition.TimeWindow = coralogixv1.RelativeTimeWindow(alertProtoTimeWindowToSchemaTimeWindow[conditionParams.GetTimeframe()])
+	relativeTimeFrame := coralogixv1.ProtoTimeFrameAndRelativeTimeFrame{TimeFrame: conditionParams.GetTimeframe(), RelativeTimeFrame: conditionParams.GetRelativeTimeframe()}
+	timeRelativeCondition.TimeWindow = alertProtoRelativeTimeFrameToSchemaTimeFrameAndRelativeTimeFrame[relativeTimeFrame]
 	timeRelativeCondition.IgnoreInfinity = conditionParams.GetIgnoreInfinity().GetValue()
 	timeRelativeCondition.GroupBy = utils.WrappedStringSliceToStringSlice(conditionParams.GetGroupBy())
 

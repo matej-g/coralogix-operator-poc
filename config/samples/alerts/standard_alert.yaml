@@ -7,9 +7,9 @@ metadata:
     app.kubernetes.io/part-of: coralogix-operator-poc
     app.kuberentes.io/managed-by: kustomize
     app.kubernetes.io/created-by: coralogix-operator-poc
-  name: stand-alert-example
+  name: standard-alert-example
 spec:
-  name: stand alert example
+  name: standard alert example
   description: alert from k8s operator
   severity: Info
   labels:

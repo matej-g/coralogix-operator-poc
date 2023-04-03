@@ -69,11 +69,11 @@ func FloatToQuantity(n float64) resource.Quantity {
 }
 
 func PointerToString(o any) string {
-	val := reflect.ValueOf(o)
-	if val.IsNil() {
+	if o == nil {
 		return "<nil>"
 	}
 
+	val := reflect.ValueOf(o)
 	if val.Kind() == reflect.Interface {
 		elm := val.Elem()
 		if elm.Kind() == reflect.Ptr && !elm.IsNil() && elm.Elem().Kind() == reflect.Ptr {
@@ -104,8 +104,12 @@ func PointerToString(o any) string {
 
 		if valueField.Kind() == reflect.Struct {
 			result += PointerToString(valueField.Interface())
+		} else if valueField.Kind() == reflect.Ptr && valueField.IsNil() {
+			result += fmt.Sprintf("Field Name: %s,\t Field Value: %v\n", typeField.Name, "<nil>")
+		} else if valueField.IsZero() {
+			result += fmt.Sprintf("Field Name: %s,\t Field Value: %v\n", typeField.Name, "<empty>")
 		} else {
-			result = fmt.Sprintf("Field Name: %s,\t Field Value: %v\n", typeField.Name, valueField.Interface())
+			result += fmt.Sprintf("Field Name: %s,\t Field Value: %v\n", typeField.Name, valueField.Interface())
 		}
 	}
 

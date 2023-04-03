@@ -801,15 +801,15 @@ spec:
                 type: string
               notifications:
                 properties:
-                  NotifyOnlyOnTriggeredGroupByValues:
-                    default: false
-                    type: boolean
-                  OnTriggerAndResolved:
-                    default: false
-                    type: boolean
                   notifyEveryMin:
                     minimum: 1
                     type: integer
+                  notifyOnlyOnTriggeredGroupByValues:
+                    default: false
+                    type: boolean
+                  onTriggerAndResolved:
+                    default: false
+                    type: boolean
                   recipients:
                     properties:
                       emails:
@@ -1631,15 +1631,15 @@ spec:
                 type: string
               notifications:
                 properties:
-                  NotifyOnlyOnTriggeredGroupByValues:
-                    default: false
-                    type: boolean
-                  OnTriggerAndResolved:
-                    default: false
-                    type: boolean
                   notifyEveryMin:
                     minimum: 1
                     type: integer
+                  notifyOnlyOnTriggeredGroupByValues:
+                    default: false
+                    type: boolean
+                  onTriggerAndResolved:
+                    default: false
+                    type: boolean
                   recipients:
                     properties:
                       emails:
