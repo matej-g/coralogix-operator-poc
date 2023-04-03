@@ -7,27 +7,33 @@ metadata:
     app.kubernetes.io/part-of: coralogix-operator-poc
     app.kuberentes.io/managed-by: kustomize
     app.kubernetes.io/created-by: coralogix-operator-poc
-  name: time-relative-alert-example
+  name: time-relative-example
 spec:
   name: time-relative alert example
   description: alert from k8s operator
-  severity: Critical
+  severity: Info
+  labels:
+    alert_type: security
+    security_severity: high
   notifications:
     recipients:
       emails: [ "user@example.com" ]
       webhooks: [ "WebhookAlerts" ]
     notifyEveryMin: 10
-    notifyOnlyOnTriggeredGroupByValues: true
   scheduling:
     daysEnabled: [ "Wednesday", "Thursday" ]
-    timeZone : UTC+02
-    startTime: 08:30
-    endTime: 20:30
+    timeZone: UTC+02
+    startTime: 08:00
+    endTime: 20:00
   alertType:
     timeRelative:
       filters:
-        severities: ["Error"]
+        applications: [ "filter:contains:nginx" ]
+        subsystems: [ "filter:startsWith:subsystem-name" ]
+        severities: [ "Warning", "Info" ]
       conditions:
         alertWhen: More
-        threshold: "3.5"
-        timeWindow: SameHourYesterday
+        threshold: 5
+        timeWindow: PreviousHour
+        ignoreInfinity: true
+        groupBy: [ "coralogix.metadata.sdkId" ]

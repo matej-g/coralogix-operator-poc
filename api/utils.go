@@ -1,6 +1,12 @@
 package api
 
-import "google.golang.org/protobuf/types/known/wrapperspb"
+import (
+	"fmt"
+	"reflect"
+
+	"google.golang.org/protobuf/types/known/wrapperspb"
+	"k8s.io/apimachinery/pkg/api/resource"
+)
 
 type Diff struct {
 	Name            string
@@ -55,5 +61,57 @@ func WrappedStringSliceToStringSlice(arr []*wrapperspb.StringValue) []string {
 	for _, s := range arr {
 		result = append(result, s.Value)
 	}
+	return result
+}
+
+func FloatToQuantity(n float64) resource.Quantity {
+	return resource.MustParse(fmt.Sprintf("%f", n))
+}
+
+func PointerToString(o any) string {
+	if o == nil {
+		return "<nil>"
+	}
+
+	val := reflect.ValueOf(o)
+	if val.Kind() == reflect.Interface {
+		elm := val.Elem()
+		if elm.Kind() == reflect.Ptr && !elm.IsNil() && elm.Elem().Kind() == reflect.Ptr {
+			val = elm
+		}
+	}
+	if val.Kind() == reflect.Ptr {
+		val = val.Elem()
+	}
+
+	if val.Kind() != reflect.Struct {
+		return val.String()
+	}
+
+	result := ""
+	for i := 0; i < val.NumField(); i++ {
+		valueField := val.Field(i)
+		typeField := val.Type().Field(i)
+		if valueField.Kind() == reflect.Interface && !valueField.IsNil() {
+			elm := valueField.Elem()
+			if elm.Kind() == reflect.Ptr && !elm.IsNil() && elm.Elem().Kind() == reflect.Ptr {
+				valueField = elm
+			}
+		}
+		if valueField.Kind() == reflect.Ptr {
+			valueField = valueField.Elem()
+		}
+
+		if valueField.Kind() == reflect.Struct {
+			result += PointerToString(valueField.Interface())
+		} else if valueField.Kind() == reflect.Ptr && valueField.IsNil() {
+			result += fmt.Sprintf("Field Name: %s,\t Field Value: %v\n", typeField.Name, "<nil>")
+		} else if valueField.IsZero() {
+			result += fmt.Sprintf("Field Name: %s,\t Field Value: %v\n", typeField.Name, "<empty>")
+		} else {
+			result += fmt.Sprintf("Field Name: %s,\t Field Value: %v\n", typeField.Name, valueField.Interface())
+		}
+	}
+
 	return result
 }

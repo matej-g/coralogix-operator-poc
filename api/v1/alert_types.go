@@ -18,6 +18,7 @@ package v1
 
 import (
 	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -33,22 +34,22 @@ import (
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
 var (
-	alertSchemaSeverityToProtoSeverity = map[AlertSeverity]alerts.AlertSeverity{
-		"Info":     alerts.AlertSeverity_ALERT_SEVERITY_INFO_OR_UNSPECIFIED,
-		"Warning":  alerts.AlertSeverity_ALERT_SEVERITY_WARNING,
-		"Critical": alerts.AlertSeverity_ALERT_SEVERITY_CRITICAL,
-		"Error":    alerts.AlertSeverity_ALERT_SEVERITY_ERROR,
+	AlertSchemaSeverityToProtoSeverity = map[AlertSeverity]alerts.AlertSeverity{
+		AlertSeverityInfo:     alerts.AlertSeverity_ALERT_SEVERITY_INFO_OR_UNSPECIFIED,
+		AlertSeverityWarning:  alerts.AlertSeverity_ALERT_SEVERITY_WARNING,
+		AlertSeverityCritical: alerts.AlertSeverity_ALERT_SEVERITY_CRITICAL,
+		AlertSeverityError:    alerts.AlertSeverity_ALERT_SEVERITY_ERROR,
 	}
-	alertSchemaDayToProtoDay = map[Day]alerts.DayOfWeek{
-		"Sunday":    alerts.DayOfWeek_DAY_OF_WEEK_SUNDAY,
-		"Monday":    alerts.DayOfWeek_DAY_OF_WEEK_MONDAY_OR_UNSPECIFIED,
-		"Tuesday":   alerts.DayOfWeek_DAY_OF_WEEK_TUESDAY,
-		"Wednesday": alerts.DayOfWeek_DAY_OF_WEEK_WEDNESDAY,
-		"Thursday":  alerts.DayOfWeek_DAY_OF_WEEK_THURSDAY,
-		"Friday":    alerts.DayOfWeek_DAY_OF_WEEK_FRIDAY,
-		"Saturday":  alerts.DayOfWeek_DAY_OF_WEEK_SATURDAY,
+	AlertSchemaDayToProtoDay = map[Day]alerts.DayOfWeek{
+		Sunday:    alerts.DayOfWeek_DAY_OF_WEEK_SUNDAY,
+		Monday:    alerts.DayOfWeek_DAY_OF_WEEK_MONDAY_OR_UNSPECIFIED,
+		Tuesday:   alerts.DayOfWeek_DAY_OF_WEEK_TUESDAY,
+		Wednesday: alerts.DayOfWeek_DAY_OF_WEEK_WEDNESDAY,
+		Thursday:  alerts.DayOfWeek_DAY_OF_WEEK_THURSDAY,
+		Friday:    alerts.DayOfWeek_DAY_OF_WEEK_FRIDAY,
+		Saturday:  alerts.DayOfWeek_DAY_OF_WEEK_SATURDAY,
 	}
-	alertSchemaTimeWindowToProtoTimeWindow = map[string]alerts.Timeframe{
+	AlertSchemaTimeWindowToProtoTimeWindow = map[string]alerts.Timeframe{
 		"Minute":          alerts.Timeframe_TIMEFRAME_1_MIN,
 		"FiveMinutes":     alerts.Timeframe_TIMEFRAME_5_MIN_OR_UNSPECIFIED,
 		"TenMinutes":      alerts.Timeframe_TIMEFRAME_10_MIN,
@@ -63,63 +64,62 @@ var (
 		"TwentyFourHours": alerts.Timeframe_TIMEFRAME_24_H,
 		"ThirtySixHours":  alerts.Timeframe_TIMEFRAME_36_H,
 	}
-	alertSchemaAutoRetireRatioToProtoAutoRetireRatio = map[AutoRetireRatio]alerts.CleanupDeadmanDuration{
-		"Never":           alerts.CleanupDeadmanDuration_CLEANUP_DEADMAN_DURATION_NEVER_OR_UNSPECIFIED,
-		"FiveMinutes":     alerts.CleanupDeadmanDuration_CLEANUP_DEADMAN_DURATION_5MIN,
-		"TenMinutes":      alerts.CleanupDeadmanDuration_CLEANUP_DEADMAN_DURATION_10MIN,
-		"Hour":            alerts.CleanupDeadmanDuration_CLEANUP_DEADMAN_DURATION_1H,
-		"TwoHours":        alerts.CleanupDeadmanDuration_CLEANUP_DEADMAN_DURATION_2H,
-		"SixHours":        alerts.CleanupDeadmanDuration_CLEANUP_DEADMAN_DURATION_6H,
-		"TwelveHours":     alerts.CleanupDeadmanDuration_CLEANUP_DEADMAN_DURATION_12H,
-		"TwentyFourHours": alerts.CleanupDeadmanDuration_CLEANUP_DEADMAN_DURATION_24H,
+	AlertSchemaAutoRetireRatioToProtoAutoRetireRatio = map[AutoRetireRatio]alerts.CleanupDeadmanDuration{
+		AutoRetireRatioNever:           alerts.CleanupDeadmanDuration_CLEANUP_DEADMAN_DURATION_NEVER_OR_UNSPECIFIED,
+		AutoRetireRatioFiveMinutes:     alerts.CleanupDeadmanDuration_CLEANUP_DEADMAN_DURATION_5MIN,
+		AutoRetireRatioTenMinutes:      alerts.CleanupDeadmanDuration_CLEANUP_DEADMAN_DURATION_10MIN,
+		AutoRetireRatioHour:            alerts.CleanupDeadmanDuration_CLEANUP_DEADMAN_DURATION_1H,
+		AutoRetireRatioTwoHours:        alerts.CleanupDeadmanDuration_CLEANUP_DEADMAN_DURATION_2H,
+		AutoRetireRatioSixHours:        alerts.CleanupDeadmanDuration_CLEANUP_DEADMAN_DURATION_6H,
+		AutoRetireRatioTwelveHours:     alerts.CleanupDeadmanDuration_CLEANUP_DEADMAN_DURATION_12H,
+		AutoRetireRatioTwentyFourHours: alerts.CleanupDeadmanDuration_CLEANUP_DEADMAN_DURATION_24H,
 	}
-	alertSchemaFiltersLogSeverityToProtoFiltersLogSeverity = map[FiltersLogSeverity]alerts.AlertFilters_LogSeverity{
-		"Debug":    alerts.AlertFilters_LOG_SEVERITY_DEBUG_OR_UNSPECIFIED,
-		"Verbose":  alerts.AlertFilters_LOG_SEVERITY_VERBOSE,
-		"Info":     alerts.AlertFilters_LOG_SEVERITY_INFO,
-		"Warning":  alerts.AlertFilters_LOG_SEVERITY_WARNING,
-		"Critical": alerts.AlertFilters_LOG_SEVERITY_CRITICAL,
-		"Error":    alerts.AlertFilters_LOG_SEVERITY_ERROR,
+	AlertSchemaFiltersLogSeverityToProtoFiltersLogSeverity = map[FiltersLogSeverity]alerts.AlertFilters_LogSeverity{
+		FiltersLogSeverityDebug:    alerts.AlertFilters_LOG_SEVERITY_DEBUG_OR_UNSPECIFIED,
+		FiltersLogSeverityVerbose:  alerts.AlertFilters_LOG_SEVERITY_VERBOSE,
+		FiltersLogSeverityInfo:     alerts.AlertFilters_LOG_SEVERITY_INFO,
+		FiltersLogSeverityWarning:  alerts.AlertFilters_LOG_SEVERITY_WARNING,
+		FiltersLogSeverityCritical: alerts.AlertFilters_LOG_SEVERITY_CRITICAL,
+		FiltersLogSeverityError:    alerts.AlertFilters_LOG_SEVERITY_ERROR,
 	}
-	alertSchemaRelativeTimeFrameToProtoTimeFrameAndRelativeTimeFrame = map[RelativeTimeWindow]protoTimeFrameAndRelativeTimeFrame{
-		"PreviousHour":      {timeFrame: alerts.Timeframe_TIMEFRAME_1_H, relativeTimeFrame: alerts.RelativeTimeframe_RELATIVE_TIMEFRAME_HOUR_OR_UNSPECIFIED},
-		"SameHourYesterday": {timeFrame: alerts.Timeframe_TIMEFRAME_1_H, relativeTimeFrame: alerts.RelativeTimeframe_RELATIVE_TIMEFRAME_DAY},
-		"SameHourLastWeek":  {timeFrame: alerts.Timeframe_TIMEFRAME_1_H, relativeTimeFrame: alerts.RelativeTimeframe_RELATIVE_TIMEFRAME_WEEK},
-		"Yesterday":         {timeFrame: alerts.Timeframe_TIMEFRAME_24_H, relativeTimeFrame: alerts.RelativeTimeframe_RELATIVE_TIMEFRAME_DAY},
-		"SameDayLastWeek":   {timeFrame: alerts.Timeframe_TIMEFRAME_24_H, relativeTimeFrame: alerts.RelativeTimeframe_RELATIVE_TIMEFRAME_WEEK},
-		"SameDayLastMonth":  {timeFrame: alerts.Timeframe_TIMEFRAME_24_H, relativeTimeFrame: alerts.RelativeTimeframe_RELATIVE_TIMEFRAME_MONTH},
+	AlertSchemaRelativeTimeFrameToProtoTimeFrameAndRelativeTimeFrame = map[RelativeTimeWindow]ProtoTimeFrameAndRelativeTimeFrame{
+		RelativeTimeWindowPreviousHour:      {TimeFrame: alerts.Timeframe_TIMEFRAME_1_H, RelativeTimeFrame: alerts.RelativeTimeframe_RELATIVE_TIMEFRAME_HOUR_OR_UNSPECIFIED},
+		RelativeTimeWindowSameHourYesterday: {TimeFrame: alerts.Timeframe_TIMEFRAME_1_H, RelativeTimeFrame: alerts.RelativeTimeframe_RELATIVE_TIMEFRAME_DAY},
+		RelativeTimeWindowSameHourLastWeek:  {TimeFrame: alerts.Timeframe_TIMEFRAME_1_H, RelativeTimeFrame: alerts.RelativeTimeframe_RELATIVE_TIMEFRAME_WEEK},
+		RelativeTimeWindowYesterday:         {TimeFrame: alerts.Timeframe_TIMEFRAME_24_H, RelativeTimeFrame: alerts.RelativeTimeframe_RELATIVE_TIMEFRAME_DAY},
+		RelativeTimeWindowSameDayLastWeek:   {TimeFrame: alerts.Timeframe_TIMEFRAME_24_H, RelativeTimeFrame: alerts.RelativeTimeframe_RELATIVE_TIMEFRAME_WEEK},
+		RelativeTimeWindowSameDayLastMonth:  {TimeFrame: alerts.Timeframe_TIMEFRAME_24_H, RelativeTimeFrame: alerts.RelativeTimeframe_RELATIVE_TIMEFRAME_MONTH},
 	}
-	alertSchemaArithmeticOperatorToProtoArithmeticOperator = map[ArithmeticOperator]alerts.MetricAlertConditionParameters_ArithmeticOperator{
-		"Avg":        alerts.MetricAlertConditionParameters_ARITHMETIC_OPERATOR_AVG_OR_UNSPECIFIED,
-		"Min":        alerts.MetricAlertConditionParameters_ARITHMETIC_OPERATOR_MIN,
-		"Max":        alerts.MetricAlertConditionParameters_ARITHMETIC_OPERATOR_MAX,
-		"Sum":        alerts.MetricAlertConditionParameters_ARITHMETIC_OPERATOR_SUM,
-		"Count":      alerts.MetricAlertConditionParameters_ARITHMETIC_OPERATOR_COUNT,
-		"Percentile": alerts.MetricAlertConditionParameters_ARITHMETIC_OPERATOR_PERCENTILE,
+	AlertSchemaArithmeticOperatorToProtoArithmeticOperator = map[ArithmeticOperator]alerts.MetricAlertConditionParameters_ArithmeticOperator{
+		ArithmeticOperatorAvg:        alerts.MetricAlertConditionParameters_ARITHMETIC_OPERATOR_AVG_OR_UNSPECIFIED,
+		ArithmeticOperatorMin:        alerts.MetricAlertConditionParameters_ARITHMETIC_OPERATOR_MIN,
+		ArithmeticOperatorMax:        alerts.MetricAlertConditionParameters_ARITHMETIC_OPERATOR_MAX,
+		ArithmeticOperatorSum:        alerts.MetricAlertConditionParameters_ARITHMETIC_OPERATOR_SUM,
+		ArithmeticOperatorCount:      alerts.MetricAlertConditionParameters_ARITHMETIC_OPERATOR_COUNT,
+		ArithmeticOperatorPercentile: alerts.MetricAlertConditionParameters_ARITHMETIC_OPERATOR_PERCENTILE,
 	}
-	alertSchemaTracingFilterFieldToProtoTracingFilterField = map[FieldFilterType]string{
+	AlertSchemaTracingFilterFieldToProtoTracingFilterField = map[FieldFilterType]string{
 		"Application": "applicationName",
 		"Subsystem":   "subsystemName",
 		"Service":     "serviceName",
 	}
-	alertSchemaTracingOperatorToProtoTracingOperator = map[FilterOperator]string{
+	AlertSchemaTracingOperatorToProtoTracingOperator = map[FilterOperator]string{
 		"Equals":    "equals",
 		"Contains":  "contains",
 		"StartWith": "startsWith",
 		"EndWith":   "endsWith",
 	}
-	alertSchemaFlowOperatorToProtoFlowOperator = map[FlowOperator]alerts.FlowOperator{
+	AlertSchemaFlowOperatorToProtoFlowOperator = map[FlowOperator]alerts.FlowOperator{
 		"And": alerts.FlowOperator_AND,
 		"Or":  alerts.FlowOperator_OR,
 	}
 	msInHour   = int(time.Hour.Milliseconds())
 	msInMinute = int(time.Minute.Milliseconds())
-	msInSecond = int(time.Second.Milliseconds())
 )
 
-type protoTimeFrameAndRelativeTimeFrame struct {
-	timeFrame         alerts.Timeframe
-	relativeTimeFrame alerts.RelativeTimeframe
+type ProtoTimeFrameAndRelativeTimeFrame struct {
+	TimeFrame         alerts.Timeframe
+	RelativeTimeFrame alerts.RelativeTimeframe
 }
 
 // AlertSpec defines the desired state of Alert
@@ -147,6 +147,9 @@ type AlertSpec struct {
 	// +optional
 	Notifications *Notifications `json:"notifications,omitempty"`
 
+	// +optional
+	PayloadFilters []string `json:"payloadFilters,omitempty"`
+
 	Scheduling *Scheduling `json:"scheduling,omitempty"`
 
 	AlertType AlertType `json:"alertType,omitempty"`
@@ -156,15 +159,15 @@ func (in *AlertSpec) ExtractCreateAlertRequest() *alerts.CreateAlertRequest {
 	enabled := wrapperspb.Bool(in.Active)
 	name := wrapperspb.String(in.Name)
 	description := wrapperspb.String(in.Description)
-	severity := alertSchemaSeverityToProtoSeverity[in.Severity]
+	severity := AlertSchemaSeverityToProtoSeverity[in.Severity]
 	metaLabels := expandMetaLabels(in.Labels)
 	expirationDate := expandExpirationDate(in.ExpirationDate)
 	notifications := expandNotifications(in.Notifications.Recipients)
 	notifyEvery := expandNotifyEvery(in.Notifications.NotifyEveryMin)
-	payloadFilters := utils.StringSliceToWrappedStringSlice(in.Notifications.PayloadFilters)
+	payloadFilters := utils.StringSliceToWrappedStringSlice(in.PayloadFilters)
 	activeWhen := expandActiveWhen(in.Scheduling)
 	alertTypeParams := expandAlertType(in.AlertType, in.Notifications.OnTriggerAndResolved,
-		in.Notifications.NotifyOnlyOnTriggeredGroupByValues, in.Notifications.IgnoreInfinity)
+		in.Notifications.NotifyOnlyOnTriggeredGroupByValues)
 
 	return &alerts.CreateAlertRequest{
 		Name:                       name,
@@ -189,17 +192,17 @@ type alertTypeParams struct {
 	tracingAlert *alerts.TracingAlert
 }
 
-func expandAlertType(alertType AlertType, onTriggerAndResolved, notifyOnlyOnTriggeredGroupByValues, ignoreInfinity bool) alertTypeParams {
+func expandAlertType(alertType AlertType, onTriggerAndResolved, notifyOnlyOnTriggeredGroupByValues bool) alertTypeParams {
 	if standard := alertType.Standard; standard != nil {
 		return expandStandard(standard, onTriggerAndResolved, notifyOnlyOnTriggeredGroupByValues)
 	} else if ratio := alertType.Ratio; ratio != nil {
-		return expandRatio(ratio, onTriggerAndResolved, notifyOnlyOnTriggeredGroupByValues, ignoreInfinity)
+		return expandRatio(ratio, onTriggerAndResolved, notifyOnlyOnTriggeredGroupByValues)
 	} else if newValue := alertType.NewValue; newValue != nil {
 		return expandNewValue(newValue)
 	} else if uniqueCount := alertType.UniqueCount; uniqueCount != nil {
 		return expandUniqueCount(uniqueCount)
 	} else if timeRelative := alertType.TimeRelative; timeRelative != nil {
-		return expandTimeRelative(timeRelative, onTriggerAndResolved, notifyOnlyOnTriggeredGroupByValues, ignoreInfinity)
+		return expandTimeRelative(timeRelative, onTriggerAndResolved, notifyOnlyOnTriggeredGroupByValues)
 	} else if metric := alertType.Metric; metric != nil {
 		return expandMetric(metric, onTriggerAndResolved, notifyOnlyOnTriggeredGroupByValues)
 	} else if tracing := alertType.Tracing; tracing != nil {
@@ -221,22 +224,22 @@ func expandStandard(standard *Standard, notifyWhenResolved, notifyOnlyOnTriggere
 	}
 }
 
-func expandRatio(ratio *Ratio, notifyWhenResolved, notifyOnlyOnTriggeredGroupByValues, ignoreInfinity bool) alertTypeParams {
+func expandRatio(ratio *Ratio, notifyWhenResolved, notifyOnlyOnTriggeredGroupByValues bool) alertTypeParams {
 	groupBy := utils.StringSliceToWrappedStringSlice(ratio.Conditions.GroupBy)
 	var groupByQ1, groupByQ2 []*wrapperspb.StringValue
 	if groupByFor := ratio.Conditions.GroupByFor; groupByFor != nil {
-		switch string(*groupByFor) {
-		case "Q1":
+		switch *groupByFor {
+		case GroupByForQ1:
 			groupByQ1 = groupBy
-		case "Q2":
+		case GroupByForQ2:
 			groupByQ2 = groupBy
-		case "Both":
+		case GroupByForBoth:
 			groupByQ1 = groupBy
 			groupByQ2 = groupBy
 		}
 	}
 
-	condition := expandRatioCondition(ratio.Conditions, groupByQ1, notifyWhenResolved, notifyOnlyOnTriggeredGroupByValues, ignoreInfinity)
+	condition := expandRatioCondition(ratio.Conditions, groupByQ1, notifyWhenResolved, notifyOnlyOnTriggeredGroupByValues)
 	filters := expandRatioFilters(&ratio.Query1Filters, &ratio.Query2Filters, groupByQ2)
 
 	return alertTypeParams{
@@ -245,12 +248,12 @@ func expandRatio(ratio *Ratio, notifyWhenResolved, notifyOnlyOnTriggeredGroupByV
 	}
 }
 
-func expandRatioCondition(conditions RatioConditions, q1GroupBy []*wrapperspb.StringValue, notifyWhenResolved, notifyOnlyOnTriggeredGroupByValues, ignoreInf bool) *alerts.AlertCondition {
+func expandRatioCondition(conditions RatioConditions, q1GroupBy []*wrapperspb.StringValue, notifyWhenResolved, notifyOnlyOnTriggeredGroupByValues bool) *alerts.AlertCondition {
 	threshold := wrapperspb.Double(conditions.Ratio.AsApproximateFloat64())
-	timeFrame := alertSchemaTimeWindowToProtoTimeWindow[string(conditions.TimeWindow)]
+	timeFrame := AlertSchemaTimeWindowToProtoTimeWindow[string(conditions.TimeWindow)]
 	notifyOnResolved := wrapperspb.Bool(notifyWhenResolved)
 	notifyGroupByOnlyAlerts := wrapperspb.Bool(notifyOnlyOnTriggeredGroupByValues)
-	ignoreInfinity := wrapperspb.Bool(ignoreInf)
+	ignoreInfinity := wrapperspb.Bool(conditions.IgnoreInfinity)
 	relatedExtendedData := expandRelatedData(conditions.ManageUndetectedValues)
 
 	parameters := &alerts.ConditionParameters{
@@ -327,7 +330,7 @@ func expandNewValue(newValue *NewValue) alertTypeParams {
 }
 
 func expandNewValueCondition(conditions *NewValueConditions) *alerts.AlertCondition {
-	timeFrame := alertSchemaTimeWindowToProtoTimeWindow[string(conditions.TimeWindow)]
+	timeFrame := AlertSchemaTimeWindowToProtoTimeWindow[string(conditions.TimeWindow)]
 	groupBy := []*wrapperspb.StringValue{wrapperspb.String(conditions.Key)}
 	parameters := &alerts.ConditionParameters{
 		Timeframe: timeFrame,
@@ -356,7 +359,7 @@ func expandUniqueCount(uniqueCount *UniqueCount) alertTypeParams {
 func expandUniqueCountCondition(conditions *UniqueCountConditions) *alerts.AlertCondition {
 	uniqueCountKey := []*wrapperspb.StringValue{wrapperspb.String(conditions.Key)}
 	threshold := wrapperspb.Double(float64(conditions.MaxUniqueValues))
-	timeFrame := alertSchemaTimeWindowToProtoTimeWindow[string(conditions.TimeWindow)]
+	timeFrame := AlertSchemaTimeWindowToProtoTimeWindow[string(conditions.TimeWindow)]
 	var groupBy []*wrapperspb.StringValue
 	var maxUniqueValuesForGroupBy *wrapperspb.UInt32Value
 	if groupByKey := conditions.GroupBy; groupByKey != nil {
@@ -381,8 +384,8 @@ func expandUniqueCountCondition(conditions *UniqueCountConditions) *alerts.Alert
 	}
 }
 
-func expandTimeRelative(timeRelative *TimeRelative, notifyWhenResolved, notifyOnlyOnTriggeredGroupByValues, ignoreInfinity bool) alertTypeParams {
-	condition := expandTimeRelativeCondition(&timeRelative.Conditions, notifyWhenResolved, notifyOnlyOnTriggeredGroupByValues, ignoreInfinity)
+func expandTimeRelative(timeRelative *TimeRelative, notifyWhenResolved, notifyOnlyOnTriggeredGroupByValues bool) alertTypeParams {
+	condition := expandTimeRelativeCondition(&timeRelative.Conditions, notifyWhenResolved, notifyOnlyOnTriggeredGroupByValues)
 	filters := expandCommonFilters(timeRelative.Filters)
 	filters.FilterType = alerts.AlertFilters_FILTER_TYPE_TIME_RELATIVE
 	return alertTypeParams{
@@ -391,18 +394,18 @@ func expandTimeRelative(timeRelative *TimeRelative, notifyWhenResolved, notifyOn
 	}
 }
 
-func expandTimeRelativeCondition(condition *TimeRelativeConditions, notifyWhenResolved, notifyOnlyOnTriggeredGroupByValues, ignoreInfinity bool) *alerts.AlertCondition {
+func expandTimeRelativeCondition(condition *TimeRelativeConditions, notifyWhenResolved, notifyOnlyOnTriggeredGroupByValues bool) *alerts.AlertCondition {
 	threshold := wrapperspb.Double(condition.Threshold.AsApproximateFloat64())
-	timeFrameAndRelativeTimeFrame := alertSchemaRelativeTimeFrameToProtoTimeFrameAndRelativeTimeFrame[condition.TimeWindow]
+	timeFrameAndRelativeTimeFrame := AlertSchemaRelativeTimeFrameToProtoTimeFrameAndRelativeTimeFrame[condition.TimeWindow]
 	groupBy := utils.StringSliceToWrappedStringSlice(condition.GroupBy)
 	notifyOnResolved := wrapperspb.Bool(notifyWhenResolved)
 	notifyGroupByOnlyAlerts := wrapperspb.Bool(notifyOnlyOnTriggeredGroupByValues)
-	ignoreInf := wrapperspb.Bool(ignoreInfinity)
+	ignoreInf := wrapperspb.Bool(condition.IgnoreInfinity)
 	relatedExtendedData := expandRelatedData(condition.ManageUndetectedValues)
 
 	parameters := &alerts.ConditionParameters{
-		Timeframe:               timeFrameAndRelativeTimeFrame.timeFrame,
-		RelativeTimeframe:       timeFrameAndRelativeTimeFrame.relativeTimeFrame,
+		Timeframe:               timeFrameAndRelativeTimeFrame.TimeFrame,
+		RelativeTimeframe:       timeFrameAndRelativeTimeFrame.RelativeTimeFrame,
 		GroupBy:                 groupBy,
 		Threshold:               threshold,
 		IgnoreInfinity:          ignoreInf,
@@ -466,7 +469,7 @@ func expandPromqlCondition(conditions *PromqlConditions, searchQuery string, not
 		SwapNullValues:            swapNullValues,
 	}
 	threshold := wrapperspb.Double(conditions.Threshold.AsApproximateFloat64())
-	timeWindow := alertSchemaTimeWindowToProtoTimeWindow[string(conditions.TimeWindow)]
+	timeWindow := AlertSchemaTimeWindowToProtoTimeWindow[string(conditions.TimeWindow)]
 	relatedExtendedData := expandRelatedData(conditions.ManageUndetectedValues)
 	notifyOnResolved := wrapperspb.Bool(notifyWhenResolved)
 
@@ -516,7 +519,7 @@ func expandLucene(lucene *Lucene, notifyWhenResolved, notifyOnlyOnTriggeredGroup
 
 func expandLuceneCondition(conditions *LuceneConditions, notifyWhenResolved, notifyOnlyOnTriggeredGroupByValues bool) *alerts.AlertCondition {
 	metricField := wrapperspb.String(conditions.MetricField)
-	arithmeticOperator := alertSchemaArithmeticOperatorToProtoArithmeticOperator[conditions.ArithmeticOperator]
+	arithmeticOperator := AlertSchemaArithmeticOperatorToProtoArithmeticOperator[conditions.ArithmeticOperator]
 	var arithmeticOperatorModifier *wrapperspb.UInt32Value
 	if modifier := conditions.ArithmeticOperatorModifier; modifier != nil {
 		arithmeticOperatorModifier = wrapperspb.UInt32(uint32(*modifier))
@@ -537,7 +540,7 @@ func expandLuceneCondition(conditions *LuceneConditions, notifyWhenResolved, not
 
 	groupBy := utils.StringSliceToWrappedStringSlice(conditions.GroupBy)
 	threshold := wrapperspb.Double(conditions.Threshold.AsApproximateFloat64())
-	timeWindow := alertSchemaTimeWindowToProtoTimeWindow[string(conditions.TimeWindow)]
+	timeWindow := AlertSchemaTimeWindowToProtoTimeWindow[string(conditions.TimeWindow)]
 	relatedExtendedData := expandRelatedData(conditions.ManageUndetectedValues)
 	notifyOnResolved := wrapperspb.Bool(notifyWhenResolved)
 	notifyGroupByOnlyAlerts := wrapperspb.Bool(notifyOnlyOnTriggeredGroupByValues)
@@ -588,7 +591,7 @@ func expandTracingCondition(conditions *TracingCondition, notifyWhenResolved boo
 	case "More":
 		var timeFrame alerts.Timeframe
 		if timeWindow := conditions.TimeWindow; timeWindow != nil {
-			timeFrame = alertSchemaTimeWindowToProtoTimeWindow[string(*timeWindow)]
+			timeFrame = AlertSchemaTimeWindowToProtoTimeWindow[string(*timeWindow)]
 		}
 		groupBy := utils.StringSliceToWrappedStringSlice(conditions.GroupBy)
 		threshold := wrapperspb.Double(float64(*conditions.Threshold))
@@ -615,7 +618,7 @@ func expandTracingCondition(conditions *TracingCondition, notifyWhenResolved boo
 }
 
 func expandTracingAlert(tracingFilters *TracingFilters) *alerts.TracingAlert {
-	conditionLatency := uint32(tracingFilters.LatencyThresholdMilliseconds) * uint32(time.Millisecond.Microseconds())
+	conditionLatency := uint32(tracingFilters.LatencyThresholdMilliseconds.AsApproximateFloat64() * float64(time.Millisecond.Microseconds()))
 	fieldFilters := expandFiltersData(tracingFilters.Applications, tracingFilters.Subsystems, tracingFilters.Services)
 	tagFilters := expandTagFilters(tracingFilters.TagFilters)
 	return &alerts.TracingAlert{
@@ -716,7 +719,6 @@ func expandFlowStage(stage FlowStage) *alerts.FlowStage {
 func expandTimeToMS(t FlowStageTimeFrame) int {
 	timeMS := msInHour * t.Hours
 	timeMS += msInMinute * t.Minutes
-	timeMS += msInSecond * t.Seconds
 
 	return timeMS
 }
@@ -732,7 +734,7 @@ func expandFlowStageGroups(groups []FlowStageGroup) []*alerts.FlowGroup {
 
 func expandFlowStageGroup(group FlowStageGroup) *alerts.FlowGroup {
 	subAlerts := expandFlowSubgroupAlerts(group.InnerFlowAlerts)
-	nextOp := alertSchemaFlowOperatorToProtoFlowOperator[group.NextOperator]
+	nextOp := AlertSchemaFlowOperatorToProtoFlowOperator[group.NextOperator]
 	return &alerts.FlowGroup{
 		Alerts: subAlerts,
 		NextOp: nextOp,
@@ -741,7 +743,7 @@ func expandFlowStageGroup(group FlowStageGroup) *alerts.FlowGroup {
 
 func expandFlowSubgroupAlerts(subgroup InnerFlowAlerts) *alerts.FlowAlerts {
 	return &alerts.FlowAlerts{
-		Op:     alertSchemaFlowOperatorToProtoFlowOperator[subgroup.Operator],
+		Op:     AlertSchemaFlowOperatorToProtoFlowOperator[subgroup.Operator],
 		Values: expandFlowInnerAlerts(subgroup.Alerts),
 	}
 }
@@ -779,7 +781,7 @@ func expandCommonFilters(filters *Filters) *alerts.AlertFilters {
 func expandAlertFiltersSeverities(severities []FiltersLogSeverity) []alerts.AlertFilters_LogSeverity {
 	result := make([]alerts.AlertFilters_LogSeverity, 0, len(severities))
 	for _, s := range severities {
-		severity := alertSchemaFiltersLogSeverityToProtoFiltersLogSeverity[s]
+		severity := AlertSchemaFiltersLogSeverityToProtoFiltersLogSeverity[s]
 		result = append(result, severity)
 	}
 	return result
@@ -811,7 +813,7 @@ func expandStandardCondition(condition StandardConditions, notifyWhenResolved, n
 	}
 	var timeFrame alerts.Timeframe
 	if condition.TimeWindow != nil {
-		timeFrame = alertSchemaTimeWindowToProtoTimeWindow[string(*condition.TimeWindow)]
+		timeFrame = AlertSchemaTimeWindowToProtoTimeWindow[string(*condition.TimeWindow)]
 	}
 	groupBy := utils.StringSliceToWrappedStringSlice(condition.GroupBy)
 	notifyOnResolved := wrapperspb.Bool(notifyWhenResolved)
@@ -858,7 +860,7 @@ func expandStandardCondition(condition StandardConditions, notifyWhenResolved, n
 func expandRelatedData(manageUndetectedValues *ManageUndetectedValues) *alerts.RelatedExtendedData {
 	if manageUndetectedValues != nil {
 		shouldTriggerDeadman := wrapperspb.Bool(manageUndetectedValues.EnableTriggeringOnUndetectedValues)
-		cleanupDeadmanDuration := alertSchemaAutoRetireRatioToProtoAutoRetireRatio[*manageUndetectedValues.AutoRetireRatio]
+		cleanupDeadmanDuration := AlertSchemaAutoRetireRatioToProtoAutoRetireRatio[*manageUndetectedValues.AutoRetireRatio]
 		return &alerts.RelatedExtendedData{
 			ShouldTriggerDeadman:   shouldTriggerDeadman,
 			CleanupDeadmanDuration: &cleanupDeadmanDuration,
@@ -880,7 +882,7 @@ func expandActiveWhen(scheduling *Scheduling) *alerts.AlertActiveWhen {
 }
 
 func expandTimeFrames(scheduling *Scheduling) []*alerts.AlertActiveTimeframe {
-	utc := extractUTC(scheduling.TimeZone)
+	utc := ExtractUTC(scheduling.TimeZone)
 	daysOfWeek := expandDaysOfWeek(scheduling.DaysEnabled)
 	start := expandTime(scheduling.StartTime)
 	end := expandTime(scheduling.EndTime)
@@ -900,7 +902,7 @@ func expandTimeFrames(scheduling *Scheduling) []*alerts.AlertActiveTimeframe {
 	}
 }
 
-func extractUTC(timeZone TimeZone) int32 {
+func ExtractUTC(timeZone TimeZone) int32 {
 	utcStr := strings.Split(string(timeZone), "UTC")[1]
 	utc, _ := strconv.Atoi(utcStr)
 	return int32(utc)
@@ -924,7 +926,7 @@ func expandTime(time *Time) *alerts.Time {
 func expandDaysOfWeek(days []Day) []alerts.DayOfWeek {
 	daysOfWeek := make([]alerts.DayOfWeek, 0, len(days))
 	for _, d := range days {
-		daysOfWeek = append(daysOfWeek, alertSchemaDayToProtoDay[d])
+		daysOfWeek = append(daysOfWeek, AlertSchemaDayToProtoDay[d])
 	}
 	return daysOfWeek
 }
@@ -1006,8 +1008,8 @@ func expandNotifyEvery(notifyEveryMin *int) *wrapperspb.DoubleValue {
 //	return result
 //}
 
-func (in *AlertSpec) DeepEqual(actualAlert *alerts.Alert) (bool, utils.Diff) {
-	if actualName := actualAlert.GetName().GetValue(); actualName != in.Name {
+func (in *AlertSpec) DeepEqual(actualAlert *AlertStatus) (bool, utils.Diff) {
+	if actualName := actualAlert.Name; actualName != in.Name {
 		return false, utils.Diff{
 			Name:    "Name",
 			Desired: in.Name,
@@ -1015,7 +1017,7 @@ func (in *AlertSpec) DeepEqual(actualAlert *alerts.Alert) (bool, utils.Diff) {
 		}
 	}
 
-	if actualDescription := actualAlert.GetDescription().GetValue(); actualDescription != in.Description {
+	if actualDescription := actualAlert.Description; actualDescription != in.Description {
 		return false, utils.Diff{
 			Name:    "Description",
 			Desired: in.Description,
@@ -1023,7 +1025,7 @@ func (in *AlertSpec) DeepEqual(actualAlert *alerts.Alert) (bool, utils.Diff) {
 		}
 	}
 
-	if actualActive := actualAlert.GetIsActive().GetValue(); actualActive != in.Active {
+	if actualActive := actualAlert.Active; actualActive != in.Active {
 		return false, utils.Diff{
 			Name:    "Active",
 			Desired: in.Active,
@@ -1031,38 +1033,31 @@ func (in *AlertSpec) DeepEqual(actualAlert *alerts.Alert) (bool, utils.Diff) {
 		}
 	}
 
-	if actualSeverity := actualAlert.GetSeverity(); actualSeverity != alertSchemaSeverityToProtoSeverity[in.Severity] {
+	if actualSeverity := actualAlert.Severity; actualSeverity != in.Severity {
 		return false, utils.Diff{
 			Name:    "Severity",
 			Desired: in.Severity,
-			Actual:  actualSeverity.String(),
+			Actual:  actualSeverity,
 		}
 	}
 
-	if !equalLabels(in.Labels, actualAlert.MetaLabels) {
+	if !reflect.DeepEqual(in.Labels, actualAlert.Labels) {
 		return false, utils.Diff{
 			Name:    "Labels",
 			Desired: in.Labels,
-			Actual:  actualAlert.MetaLabels,
+			Actual:  actualAlert.Labels,
 		}
 	}
 
-	if expirationDate, actualExpirationDate := in.ExpirationDate, actualAlert.GetExpiration(); expirationDate == nil && actualExpirationDate != nil {
+	if !reflect.DeepEqual(in.ExpirationDate, actualAlert.ExpirationDate) {
 		return false, utils.Diff{
 			Name:    "ExpirationDate",
-			Desired: in.ExpirationDate,
-			Actual:  *actualExpirationDate,
-		}
-	} else if expirationDate != nil && !expirationDate.DeepEqual(actualExpirationDate) {
-		return false, utils.Diff{
-			Name:    "ExpirationDate",
-			Desired: *in.ExpirationDate,
-			Actual:  *actualExpirationDate,
+			Desired: utils.PointerToString(in.ExpirationDate),
+			Actual:  utils.PointerToString(actualAlert.ExpirationDate),
 		}
 	}
 
-	var notifyData notificationsAlertTypeData
-	if equal, diff := in.AlertType.DeepEqual(actualAlert, &notifyData); !equal {
+	if equal, diff := in.AlertType.DeepEqual(actualAlert.AlertType); !equal {
 		return false, utils.Diff{
 			Name:    fmt.Sprintf("AlertType.%s", diff.Name),
 			Desired: diff.Desired,
@@ -1070,8 +1065,7 @@ func (in *AlertSpec) DeepEqual(actualAlert *alerts.Alert) (bool, utils.Diff) {
 		}
 	}
 
-	if equal, diff := in.Notifications.DeepEqual(actualAlert.GetNotifications(),
-		actualAlert.GetNotificationPayloadFilters(), actualAlert.GetNotifyEvery(), notifyData); !equal {
+	if equal, diff := in.Notifications.DeepEqual(actualAlert.Notifications); !equal {
 		return false, utils.Diff{
 			Name:    fmt.Sprintf("Notifications.%s", diff.Name),
 			Desired: diff.Desired,
@@ -1079,13 +1073,21 @@ func (in *AlertSpec) DeepEqual(actualAlert *alerts.Alert) (bool, utils.Diff) {
 		}
 	}
 
-	if scheduling, actualScheduling := in.Scheduling, actualAlert.GetActiveWhen(); scheduling == nil && actualScheduling != nil {
+	if !utils.SlicesWithUniqueValuesEqual(in.PayloadFilters, actualAlert.PayloadFilters) {
+		return false, utils.Diff{
+			Name:    "PayloadFilters",
+			Desired: in.PayloadFilters,
+			Actual:  actualAlert.PayloadFilters,
+		}
+	}
+
+	if scheduling, actualScheduling := in.Scheduling, actualAlert.Scheduling; scheduling == nil && actualScheduling != nil {
 		return false, utils.Diff{
 			Name:    "Scheduling",
 			Desired: scheduling,
 			Actual:  actualScheduling,
 		}
-	} else if equal, diff := scheduling.DeepEqual(actualScheduling); !equal {
+	} else if equal, diff := scheduling.DeepEqual(*actualScheduling); !equal {
 		return false, utils.Diff{
 			Name:    fmt.Sprintf("Scheduling.%s", diff.Name),
 			Desired: diff.Desired,
@@ -1096,42 +1098,20 @@ func (in *AlertSpec) DeepEqual(actualAlert *alerts.Alert) (bool, utils.Diff) {
 	return true, utils.Diff{}
 }
 
-type notificationsAlertTypeData struct {
-	onTriggerAndResolved *wrapperspb.BoolValue
-
-	notifyOnlyOnTriggeredGroupByValues *wrapperspb.BoolValue
-
-	ignoreInfinity *wrapperspb.BoolValue
-}
-
-func equalLabels(labels map[string]string, actualLabels []*alerts.MetaLabel) bool {
-	if len(labels) != len(actualLabels) {
-		return false
-	}
-
-	for _, label := range actualLabels {
-		if value, ok := labels[label.GetKey().GetValue()]; !ok || value != label.GetValue().GetValue() {
-			return false
-		}
-	}
-
-	return true
-}
-
 func (in *AlertSpec) ExtractUpdateAlertRequest(id string) *alerts.UpdateAlertByUniqueIdRequest {
 	uniqueIdentifier := wrapperspb.String(id)
 	enabled := wrapperspb.Bool(in.Active)
 	name := wrapperspb.String(in.Name)
 	description := wrapperspb.String(in.Description)
-	severity := alertSchemaSeverityToProtoSeverity[in.Severity]
+	severity := AlertSchemaSeverityToProtoSeverity[in.Severity]
 	metaLabels := expandMetaLabels(in.Labels)
 	expirationDate := expandExpirationDate(in.ExpirationDate)
 	notifications := expandNotifications(in.Notifications.Recipients)
 	notifyEvery := expandNotifyEvery(in.Notifications.NotifyEveryMin)
-	payloadFilters := utils.StringSliceToWrappedStringSlice(in.Notifications.PayloadFilters)
+	payloadFilters := utils.StringSliceToWrappedStringSlice(in.PayloadFilters)
 	activeWhen := expandActiveWhen(in.Scheduling)
 	alertTypeParams := expandAlertType(in.AlertType, in.Notifications.OnTriggerAndResolved,
-		in.Notifications.NotifyOnlyOnTriggeredGroupByValues, in.Notifications.IgnoreInfinity)
+		in.Notifications.NotifyOnlyOnTriggeredGroupByValues)
 
 	return &alerts.UpdateAlertByUniqueIdRequest{
 		Alert: &alerts.Alert{
@@ -1156,6 +1136,13 @@ func (in *AlertSpec) ExtractUpdateAlertRequest(id string) *alerts.UpdateAlertByU
 // +kubebuilder:validation:Enum=Info;Warning;Critical;Error
 type AlertSeverity string
 
+const (
+	AlertSeverityInfo     AlertSeverity = "Info"
+	AlertSeverityWarning  AlertSeverity = "Warning"
+	AlertSeverityCritical AlertSeverity = "Critical"
+	AlertSeverityError    AlertSeverity = "Error"
+)
+
 type ExpirationDate struct {
 	// +kubebuilder:validation:Minimum:=1
 	// +kubebuilder:validation:Maximum:=31
@@ -1179,9 +1166,6 @@ type Notifications struct {
 	OnTriggerAndResolved bool `json:"onTriggerAndResolved,omitempty"`
 
 	//+kubebuilder:default=false
-	IgnoreInfinity bool `json:"ignoreInfinity,omitempty"`
-
-	//+kubebuilder:default=false
 	NotifyOnlyOnTriggeredGroupByValues bool `json:"notifyOnlyOnTriggeredGroupByValues,omitempty"`
 
 	// +optional
@@ -1190,68 +1174,38 @@ type Notifications struct {
 	// +optional
 	// +kubebuilder:validation:Minimum:=1
 	NotifyEveryMin *int `json:"notifyEveryMin,omitempty"`
-
-	// +optional
-	PayloadFilters []string `json:"payloadFilters,omitempty"`
 }
 
-func (in *Notifications) DeepEqual(actualRecipients *alerts.AlertNotifications,
-	actualNotifyPayloadFilters []*wrapperspb.StringValue, actualNotifyEvery *wrapperspb.DoubleValue,
-	actualNotifyAlertTypeData notificationsAlertTypeData) (bool, utils.Diff) {
-
-	if emails, actualEmails := in.Recipients.Emails, utils.WrappedStringSliceToStringSlice(actualRecipients.Emails); !utils.SlicesWithUniqueValuesEqual(emails, actualEmails) {
+func (in *Notifications) DeepEqual(actualNotifications *Notifications) (bool, utils.Diff) {
+	if equal, diff := in.Recipients.DeepEqual(actualNotifications.Recipients); !equal {
 		return false, utils.Diff{
-			Name: "Emails",
+			Name:    fmt.Sprintf("Recipients.%s", diff.Name),
+			Desired: diff.Desired,
+			Actual:  diff.Actual,
 		}
 	}
 
-	if webhooks, actualWebhooks := in.Recipients.Webhooks, utils.WrappedStringSliceToStringSlice(actualRecipients.Integrations); !utils.SlicesWithUniqueValuesEqual(webhooks, actualWebhooks) {
-		return false, utils.Diff{
-			Name: "Webhooks",
-		}
-	}
-
-	if actualNotifyPayloadFilters := utils.WrappedStringSliceToStringSlice(actualNotifyPayloadFilters); !utils.SlicesWithUniqueValuesEqual(in.PayloadFilters, actualNotifyPayloadFilters) {
-		return false, utils.Diff{
-			Name: "PayloadFilters",
-		}
-	}
-
-	if in.NotifyEveryMin == nil && actualNotifyEvery != nil {
+	if !reflect.DeepEqual(in.NotifyEveryMin, actualNotifications.NotifyEveryMin) {
 		return false, utils.Diff{
 			Name:    "NotifyEveryMin",
 			Desired: in.NotifyEveryMin,
-			Actual:  actualNotifyEvery.GetValue(),
-		}
-	} else if desiredNotifyEverySec := float64(*in.NotifyEveryMin) * 60; actualNotifyEvery.GetValue() != desiredNotifyEverySec {
-		return false, utils.Diff{
-			Name:    "NotifyEveryMin",
-			Desired: fmt.Sprintf("%d (minutes)", *in.NotifyEveryMin),
-			Actual:  fmt.Sprintf("%f (seconds)", actualNotifyEvery.GetValue()),
+			Actual:  utils.PointerToString(actualNotifications.NotifyEveryMin),
 		}
 	}
 
-	if actualOnTriggerAndResolved := actualNotifyAlertTypeData.onTriggerAndResolved.GetValue(); in.OnTriggerAndResolved != actualOnTriggerAndResolved {
+	if in.OnTriggerAndResolved != actualNotifications.OnTriggerAndResolved {
 		return false, utils.Diff{
 			Name:    "OnTriggerAndResolved",
 			Desired: in.OnTriggerAndResolved,
-			Actual:  actualOnTriggerAndResolved,
+			Actual:  actualNotifications.OnTriggerAndResolved,
 		}
 	}
 
-	if actualNotifyOnlyOnTriggeredGroupByValues := actualNotifyAlertTypeData.notifyOnlyOnTriggeredGroupByValues.GetValue(); in.NotifyOnlyOnTriggeredGroupByValues != actualNotifyOnlyOnTriggeredGroupByValues {
+	if in.NotifyOnlyOnTriggeredGroupByValues != actualNotifications.NotifyOnlyOnTriggeredGroupByValues {
 		return false, utils.Diff{
 			Name:    "NotifyOnlyOnTriggeredGroupByValues",
 			Desired: in.NotifyOnlyOnTriggeredGroupByValues,
-			Actual:  actualNotifyOnlyOnTriggeredGroupByValues,
-		}
-	}
-
-	if actualIgnoreInfinity := actualNotifyAlertTypeData.ignoreInfinity.GetValue(); in.IgnoreInfinity != actualIgnoreInfinity {
-		return false, utils.Diff{
-			Name:    "IgnoreInfinity",
-			Desired: in.IgnoreInfinity,
-			Actual:  actualIgnoreInfinity,
+			Actual:  actualNotifications.NotifyOnlyOnTriggeredGroupByValues,
 		}
 	}
 
@@ -1266,6 +1220,26 @@ type Recipients struct {
 	Webhooks []string `json:"webhooks,omitempty"`
 }
 
+func (in *Recipients) DeepEqual(actualRecipients Recipients) (bool, utils.Diff) {
+	if !utils.SlicesWithUniqueValuesEqual(in.Emails, actualRecipients.Emails) {
+		return false, utils.Diff{
+			Name:    "Emails",
+			Desired: in.Emails,
+			Actual:  actualRecipients.Emails,
+		}
+	}
+
+	if !utils.SlicesWithUniqueValuesEqual(in.Webhooks, actualRecipients.Webhooks) {
+		return false, utils.Diff{
+			Name:    "Webhooks",
+			Desired: in.Webhooks,
+			Actual:  actualRecipients.Webhooks,
+		}
+	}
+
+	return true, utils.Diff{}
+}
+
 type Scheduling struct {
 	//+kubebuilder:default=UTC+00
 	TimeZone TimeZone `json:"timeZone,omitempty"`
@@ -1277,18 +1251,36 @@ type Scheduling struct {
 	EndTime *Time `json:"endTime,omitempty"`
 }
 
-func (in *Scheduling) DeepEqual(activeWhen *alerts.AlertActiveWhen) (bool, utils.Diff) {
-	if timeFrames, actualTimeFrames := expandTimeFrames(in), activeWhen.GetTimeframes(); len(timeFrames) != len(actualTimeFrames) {
+func (in *Scheduling) DeepEqual(scheduling Scheduling) (bool, utils.Diff) {
+	if in.TimeZone != scheduling.TimeZone {
 		return false, utils.Diff{
-			Name:    "TimeFrame",
-			Desired: timeFrames,
-			Actual:  actualTimeFrames,
+			Name:    "TimeZone",
+			Desired: in.TimeZone,
+			Actual:  scheduling.TimeZone,
 		}
-	} else if equal, diff := DeepEqualTimeFrames(timeFrames[0], actualTimeFrames[0]); !equal {
+	}
+
+	if !utils.SlicesWithUniqueValuesEqual(in.DaysEnabled, scheduling.DaysEnabled) {
 		return false, utils.Diff{
-			Name:    fmt.Sprintf("TimeFrame.%s", diff.Name),
-			Desired: diff.Desired,
-			Actual:  diff.Actual,
+			Name:    "DaysEnabled",
+			Desired: in.DaysEnabled,
+			Actual:  scheduling.DaysEnabled,
+		}
+	}
+
+	if !reflect.DeepEqual(in.StartTime, scheduling.StartTime) {
+		return false, utils.Diff{
+			Name:    "StartTime",
+			Desired: string(*in.StartTime),
+			Actual:  string(*scheduling.StartTime),
+		}
+	}
+
+	if !reflect.DeepEqual(in.EndTime, scheduling.EndTime) {
+		return false, utils.Diff{
+			Name:    "EndTime",
+			Desired: utils.PointerToString(in.EndTime),
+			Actual:  utils.PointerToString(scheduling.EndTime),
 		}
 	}
 
@@ -1335,7 +1327,7 @@ func DeepEqualTimeRanges(timeRange, actualTimeRange *alerts.TimeRange) (bool, ut
 }
 
 func DeepEqualTimes(time, actualTime *alerts.Time) (bool, utils.Diff) {
-	if time.GetHours() != actualTime.GetHours() || time.GetMinutes() != actualTime.GetMinutes() || time.GetSeconds() != actualTime.GetSeconds() {
+	if time.GetHours() != actualTime.GetHours() || time.GetMinutes() != actualTime.GetMinutes() {
 		return false, utils.Diff{
 			Name:    "Hour",
 			Desired: time.String(),
@@ -1351,6 +1343,16 @@ type TimeZone string
 
 // +kubebuilder:validation:Enum=Sunday;Monday;Tuesday;Wednesday;Thursday;Friday;Saturday;
 type Day string
+
+const (
+	Sunday    Day = "Sunday"
+	Monday    Day = "Monday"
+	Tuesday   Day = "Tuesday"
+	Wednesday Day = "Wednesday"
+	Thursday  Day = "Thursday"
+	Friday    Day = "Friday"
+	Saturday  Day = "Saturday"
+)
 
 // +kubebuilder:validation:Pattern=`^(0\d|1\d|2[0-3]):[0-5]\d$`
 type Time string
@@ -1381,111 +1383,119 @@ type AlertType struct {
 	Flow *Flow `json:"flow,omitempty"`
 }
 
-func (in *AlertType) DeepEqual(actualAlert *alerts.Alert, notifyData *notificationsAlertTypeData) (bool, utils.Diff) {
-	actualFilters := actualAlert.GetFilters()
-	actualCondition := actualAlert.GetCondition()
-
-	switch actualFilters.GetFilterType() {
-	case alerts.AlertFilters_FILTER_TYPE_TEXT_OR_UNSPECIFIED:
-		if newValueCondition, ok := actualCondition.GetCondition().(*alerts.AlertCondition_NewValue); ok {
-			if newValue := in.NewValue; newValue == nil {
-				return false, utils.Diff{
-					Name:   "Type",
-					Actual: "NewValue",
-				}
-			} else if equal, diff := newValue.DeepEqual(actualFilters, newValueCondition); !equal {
-				return false, utils.Diff{
-					Name:    fmt.Sprintf("NewValue.%s", diff.Name),
-					Desired: diff.Desired,
-					Actual:  diff.Actual,
-				}
+func (in *AlertType) DeepEqual(actualAlert AlertType) (bool, utils.Diff) {
+	if newValue := in.NewValue; newValue != nil {
+		if actualNewValue := actualAlert.NewValue; actualNewValue == nil {
+			return false, utils.Diff{
+				Name:   "Type",
+				Actual: "NewValue",
 			}
-		} else {
-			if standard := in.Standard; standard == nil {
-				return false, utils.Diff{
-					Name:   "Type",
-					Actual: "Standard",
-				}
-			} else if equal, diff := standard.DeepEqual(actualFilters, actualAlert.GetCondition(), notifyData); !equal {
-				return false, utils.Diff{
-					Name:    fmt.Sprintf("Standard.%s", diff.Name),
-					Desired: diff.Desired,
-					Actual:  diff.Actual,
-				}
+		} else if equal, diff := newValue.DeepEqual(*actualNewValue); !equal {
+			return false, utils.Diff{
+				Name:    fmt.Sprintf("NewValue.%s", diff.Name),
+				Desired: diff.Desired,
+				Actual:  diff.Actual,
 			}
 		}
-	case alerts.AlertFilters_FILTER_TYPE_RATIO:
-		if ratio := in.Ratio; ratio == nil {
+	}
+
+	if standard := in.Standard; standard != nil {
+		if actualStandard := actualAlert.Standard; actualStandard == nil {
+			return false, utils.Diff{
+				Name:   "Type",
+				Actual: "Standard",
+			}
+		} else if equal, diff := standard.DeepEqual(*actualStandard); !equal {
+			return false, utils.Diff{
+				Name:    fmt.Sprintf("Standard.%s", diff.Name),
+				Desired: diff.Desired,
+				Actual:  diff.Actual,
+			}
+		}
+	}
+
+	if ratio := in.Ratio; ratio != nil {
+		if actualRatio := actualAlert.Ratio; actualRatio == nil {
 			return false, utils.Diff{
 				Name:   "Type",
 				Actual: "Ratio",
 			}
-		} else if equal, diff := ratio.DeepEqual(actualFilters, actualAlert.GetCondition(), notifyData); !equal {
+		} else if equal, diff := ratio.DeepEqual(*actualRatio); !equal {
 			return false, utils.Diff{
 				Name:    fmt.Sprintf("Ratio.%s", diff.Name),
 				Desired: diff.Desired,
 				Actual:  diff.Actual,
 			}
 		}
-	case alerts.AlertFilters_FILTER_TYPE_UNIQUE_COUNT:
-		if uniqueCount := in.UniqueCount; uniqueCount == nil {
+	}
+
+	if uniqueCount := in.UniqueCount; uniqueCount != nil {
+		if actualUniqueCount := actualAlert.UniqueCount; actualUniqueCount == nil {
 			return false, utils.Diff{
 				Name:   "Type",
 				Actual: "UniqueCount",
 			}
-		} else if equal, diff := uniqueCount.DeepEqual(actualFilters, actualAlert.GetCondition()); !equal {
+		} else if equal, diff := uniqueCount.DeepEqual(*actualUniqueCount); !equal {
 			return false, utils.Diff{
 				Name:    fmt.Sprintf("UniqueCount.%s", diff.Name),
 				Desired: diff.Desired,
 				Actual:  diff.Actual,
 			}
 		}
-	case alerts.AlertFilters_FILTER_TYPE_TIME_RELATIVE:
-		if timeRelative := in.TimeRelative; timeRelative == nil {
+	}
+
+	if timeRelative := in.TimeRelative; timeRelative != nil {
+		if actualTimeRelative := actualAlert.TimeRelative; actualTimeRelative == nil {
 			return false, utils.Diff{
 				Name:   "Type",
 				Actual: "TimeRelative",
 			}
-		} else if equal, diff := timeRelative.DeepEqual(actualFilters, actualAlert.GetCondition(), notifyData); !equal {
+		} else if equal, diff := timeRelative.DeepEqual(*actualTimeRelative); !equal {
 			return false, utils.Diff{
 				Name:    fmt.Sprintf("TimeRelative.%s", diff.Name),
 				Desired: diff.Desired,
 				Actual:  diff.Actual,
 			}
 		}
-	case alerts.AlertFilters_FILTER_TYPE_METRIC:
-		if metric := in.Metric; metric == nil {
+	}
+
+	if metric := in.Metric; metric != nil {
+		if actualMetric := actualAlert.Metric; actualMetric == nil {
 			return false, utils.Diff{
 				Name:   "Type",
 				Actual: "Metric",
 			}
-		} else if equal, diff := metric.DeepEqual(actualFilters, actualAlert.GetCondition(), notifyData); !equal {
+		} else if equal, diff := metric.DeepEqual(*actualMetric); !equal {
 			return false, utils.Diff{
 				Name:    fmt.Sprintf("Metric.%s", diff.Name),
 				Desired: diff.Desired,
 				Actual:  diff.Actual,
 			}
 		}
-	case alerts.AlertFilters_FILTER_TYPE_TRACING:
-		if tracing := in.Tracing; tracing == nil {
+	}
+
+	if tracing := in.Tracing; tracing != nil {
+		if actulTracing := actualAlert.Tracing; actulTracing == nil {
 			return false, utils.Diff{
 				Name:   "Type",
-				Actual: "TimeRelative",
+				Actual: "Tracing",
 			}
-		} else if equal, diff := tracing.DeepEqual(actualAlert.GetTracingAlert(), actualAlert.GetCondition(), notifyData); !equal {
+		} else if equal, diff := tracing.DeepEqual(*actulTracing); !equal {
 			return false, utils.Diff{
-				Name:    fmt.Sprintf("TimeRelative.%s", diff.Name),
+				Name:    fmt.Sprintf("Tracing.%s", diff.Name),
 				Desired: diff.Desired,
 				Actual:  diff.Actual,
 			}
 		}
-	case alerts.AlertFilters_FILTER_TYPE_FLOW:
-		if flow := in.Flow; flow == nil {
+	}
+
+	if flow := in.Flow; flow != nil {
+		if actualFlow := actualAlert.Flow; actualFlow == nil {
 			return false, utils.Diff{
 				Name:   "Type",
 				Actual: "Flow",
 			}
-		} else if equal, diff := flow.DeepEqual(actualAlert.GetCondition().GetFlow()); !equal {
+		} else if equal, diff := flow.DeepEqual(*actualFlow); !equal {
 			return false, utils.Diff{
 				Name:    fmt.Sprintf("Flow.%s", diff.Name),
 				Desired: diff.Desired,
@@ -1504,8 +1514,8 @@ type Standard struct {
 	Conditions StandardConditions `json:"conditions,omitempty"`
 }
 
-func (in *Standard) DeepEqual(filters *alerts.AlertFilters, condition *alerts.AlertCondition, data *notificationsAlertTypeData) (bool, utils.Diff) {
-	if equal, diff := in.Conditions.DeepEqual(condition, data); !equal {
+func (in *Standard) DeepEqual(actualStandard Standard) (bool, utils.Diff) {
+	if equal, diff := in.Conditions.DeepEqual(actualStandard.Conditions); !equal {
 		return false, utils.Diff{
 			Name:    fmt.Sprintf("Conditions.%s", diff.Name),
 			Desired: diff.Desired,
@@ -1513,7 +1523,7 @@ func (in *Standard) DeepEqual(filters *alerts.AlertFilters, condition *alerts.Al
 		}
 	}
 
-	if equal, diff := in.Filters.DeepEqual(filters); !equal {
+	if equal, diff := in.Filters.DeepEqual(actualStandard.Filters); !equal {
 		return false, utils.Diff{
 			Name:    fmt.Sprintf("Filters.%s", diff.Name),
 			Desired: diff.Desired,
@@ -1522,25 +1532,6 @@ func (in *Standard) DeepEqual(filters *alerts.AlertFilters, condition *alerts.Al
 	}
 
 	return true, utils.Diff{}
-}
-
-func equalSeverities(severities []FiltersLogSeverity, actualSeverities []alerts.AlertFilters_LogSeverity) bool {
-	if len(severities) != len(actualSeverities) {
-		return false
-	}
-
-	valuesSet := make(map[alerts.AlertFilters_LogSeverity]bool, len(severities))
-	for _, _a := range actualSeverities {
-		valuesSet[_a] = true
-	}
-
-	for _, _b := range severities {
-		if !valuesSet[alertSchemaFiltersLogSeverityToProtoFiltersLogSeverity[_b]] {
-			return false
-		}
-	}
-
-	return true
 }
 
 type Ratio struct {
@@ -1568,8 +1559,8 @@ type RatioQ2Filters struct {
 	Subsystems []string `json:"subsystems,omitempty"`
 }
 
-func (in *Ratio) DeepEqual(filters *alerts.AlertFilters, condition *alerts.AlertCondition, data *notificationsAlertTypeData) (bool, utils.Diff) {
-	if equal, diff := in.Query1Filters.DeepEqual(filters); !equal {
+func (in *Ratio) DeepEqual(actualRatio Ratio) (bool, utils.Diff) {
+	if equal, diff := in.Query1Filters.DeepEqual(&actualRatio.Query1Filters); !equal {
 		return false, utils.Diff{
 			Name:    fmt.Sprintf("Q1Filters.%s", diff.Name),
 			Desired: diff.Desired,
@@ -1577,8 +1568,7 @@ func (in *Ratio) DeepEqual(filters *alerts.AlertFilters, condition *alerts.Alert
 		}
 	}
 
-	actualQ2Filters := filters.GetRatioAlerts()[0]
-	if equal, diff := in.Query2Filters.DeepEqual(actualQ2Filters); !equal {
+	if equal, diff := in.Query2Filters.DeepEqual(actualRatio.Query2Filters); !equal {
 		return false, utils.Diff{
 			Name:    fmt.Sprintf("Q2Filters.%s", diff.Name),
 			Desired: diff.Desired,
@@ -1586,8 +1576,7 @@ func (in *Ratio) DeepEqual(filters *alerts.AlertFilters, condition *alerts.Alert
 		}
 	}
 
-	actualQ2GroupBy := actualQ2Filters.GetGroupBy()
-	if equal, diff := in.Conditions.DeepEqual(condition, actualQ2GroupBy, data); !equal {
+	if equal, diff := in.Conditions.DeepEqual(actualRatio.Conditions); !equal {
 		return false, utils.Diff{
 			Name:    fmt.Sprintf("Conditions.%s", diff.Name),
 			Desired: diff.Desired,
@@ -1605,8 +1594,8 @@ type NewValue struct {
 	Conditions NewValueConditions `json:"conditions,omitempty"`
 }
 
-func (in *NewValue) DeepEqual(filters *alerts.AlertFilters, condition *alerts.AlertCondition_NewValue) (bool, utils.Diff) {
-	if equal, diff := in.Conditions.DeepEqual(condition); !equal {
+func (in *NewValue) DeepEqual(newValue NewValue) (bool, utils.Diff) {
+	if equal, diff := in.Conditions.DeepEqual(newValue.Conditions); !equal {
 		return false, utils.Diff{
 			Name:    fmt.Sprintf("Conditions.%s", diff.Name),
 			Desired: diff.Desired,
@@ -1614,7 +1603,7 @@ func (in *NewValue) DeepEqual(filters *alerts.AlertFilters, condition *alerts.Al
 		}
 	}
 
-	if equal, diff := in.Filters.DeepEqual(filters); !equal {
+	if equal, diff := in.Filters.DeepEqual(newValue.Filters); !equal {
 		return false, utils.Diff{
 			Name:    fmt.Sprintf("Filters.%s", diff.Name),
 			Desired: diff.Desired,
@@ -1632,8 +1621,8 @@ type UniqueCount struct {
 	Conditions UniqueCountConditions `json:"conditions,omitempty"`
 }
 
-func (in *UniqueCount) DeepEqual(filters *alerts.AlertFilters, condition *alerts.AlertCondition) (bool, utils.Diff) {
-	if equal, diff := in.Conditions.DeepEqual(condition); !equal {
+func (in *UniqueCount) DeepEqual(actualUniqueCount UniqueCount) (bool, utils.Diff) {
+	if equal, diff := in.Conditions.DeepEqual(actualUniqueCount.Conditions); !equal {
 		return false, utils.Diff{
 			Name:    fmt.Sprintf("Conditions.%s", diff.Name),
 			Desired: diff.Desired,
@@ -1641,7 +1630,7 @@ func (in *UniqueCount) DeepEqual(filters *alerts.AlertFilters, condition *alerts
 		}
 	}
 
-	if equal, diff := in.Filters.DeepEqual(filters); !equal {
+	if equal, diff := in.Filters.DeepEqual(actualUniqueCount.Filters); !equal {
 		return false, utils.Diff{
 			Name:    fmt.Sprintf("Filters.%s", diff.Name),
 			Desired: diff.Desired,
@@ -1659,15 +1648,15 @@ type TimeRelative struct {
 	Conditions TimeRelativeConditions `json:"conditions,omitempty"`
 }
 
-func (in *TimeRelative) DeepEqual(filters *alerts.AlertFilters, condition *alerts.AlertCondition, data *notificationsAlertTypeData) (bool, utils.Diff) {
-	if equal, diff := in.Conditions.DeepEqual(condition, data); !equal {
+func (in *TimeRelative) DeepEqual(actualTimeRelative TimeRelative) (bool, utils.Diff) {
+	if equal, diff := in.Conditions.DeepEqual(actualTimeRelative.Conditions); !equal {
 		return false, utils.Diff{
 			Name:    fmt.Sprintf("Conditions.%s", diff.Name),
 			Desired: diff.Desired,
 			Actual:  diff.Actual,
 		}
 	}
-	if equal, diff := in.Filters.DeepEqual(filters); !equal {
+	if equal, diff := in.Filters.DeepEqual(actualTimeRelative.Filters); !equal {
 		return false, utils.Diff{
 			Name:    fmt.Sprintf("Filters.%s", diff.Name),
 			Desired: diff.Desired,
@@ -1686,14 +1675,38 @@ type Metric struct {
 	Promql *Promql `json:"promql,omitempty"`
 }
 
-func (in *Metric) DeepEqual(filters *alerts.AlertFilters, condition *alerts.AlertCondition, data *notificationsAlertTypeData) (bool, utils.Diff) {
+func (in *Metric) DeepEqual(actualMetric Metric) (bool, utils.Diff) {
 	if promql := in.Promql; promql != nil {
-		return promql.DeepEqual(condition, data)
+		if actualMetric.Promql == nil {
+			return false, utils.Diff{
+				Name:    "Promql",
+				Desired: promql,
+				Actual:  "nil",
+			}
+		} else if equal, diff := promql.DeepEqual(*actualMetric.Promql); !equal {
+			return false, utils.Diff{
+				Name:    fmt.Sprintf("Promql.%s", diff.Name),
+				Desired: diff.Desired,
+				Actual:  diff.Actual,
+			}
+		}
 	} else if lucene := in.Lucene; lucene != nil {
-		return lucene.DeepEqual(filters, condition, data)
+		if actualMetric.Lucene == nil {
+			return false, utils.Diff{
+				Name:    "Lucene",
+				Desired: promql,
+				Actual:  "nil",
+			}
+		} else if equal, diff := lucene.DeepEqual(*actualMetric.Lucene); !equal {
+			return false, utils.Diff{
+				Name:    fmt.Sprintf("Lucene.%s", diff.Name),
+				Desired: diff.Desired,
+				Actual:  diff.Actual,
+			}
+		}
 	}
 
-	return false, utils.Diff{}
+	return true, utils.Diff{}
 }
 
 type Lucene struct {
@@ -1703,53 +1716,20 @@ type Lucene struct {
 	Conditions LuceneConditions `json:"conditions,omitempty"`
 }
 
-func (in *Lucene) DeepEqual(filters *alerts.AlertFilters, condition *alerts.AlertCondition, data *notificationsAlertTypeData) (bool, utils.Diff) {
-	var conditionParams *alerts.ConditionParameters
-	var actualAlertWhen string
-	switch condition := condition.GetCondition().(type) {
-	case *alerts.AlertCondition_LessThan:
-		actualAlertWhen = "Less"
-		conditionParams = condition.LessThan.GetParameters()
-	case *alerts.AlertCondition_MoreThan:
-		conditionParams = condition.MoreThan.GetParameters()
-		actualAlertWhen = "More"
-	}
-
-	if conditionParams.GetMetricAlertPromqlParameters() != nil {
+func (in *Lucene) DeepEqual(actualLucene Lucene) (bool, utils.Diff) {
+	if equal, diff := in.Conditions.DeepEqual(actualLucene.Conditions); !equal {
 		return false, utils.Diff{
-			Name:    "Type",
-			Desired: "Lucene",
-			Actual:  "Promql",
-		}
-	}
-
-	if alertWhen := string(in.Conditions.AlertWhen); actualAlertWhen != alertWhen {
-		return false, utils.Diff{
-			Name:    "Lucene.Conditions.AlertWhen",
-			Desired: alertWhen,
-			Actual:  actualAlertWhen,
-		}
-	}
-
-	if searchQuery, actualSearchQuery := in.SearchQuery, filters.GetText(); searchQuery == nil && actualSearchQuery != nil {
-		return false, utils.Diff{
-			Name:    "Lucene.SearchQuery",
-			Desired: searchQuery,
-			Actual:  *actualSearchQuery,
-		}
-	} else if searchQuery, actualSearchQuery := *searchQuery, actualSearchQuery.GetValue(); searchQuery != actualSearchQuery {
-		return false, utils.Diff{
-			Name:    "Lucene.SearchQuery",
-			Desired: searchQuery,
-			Actual:  actualSearchQuery,
-		}
-	}
-
-	if equal, diff := in.Conditions.DeepEqual(conditionParams, data); !equal {
-		return false, utils.Diff{
-			Name:    fmt.Sprintf("Lucene.Conditions.%s", diff.Name),
+			Name:    fmt.Sprintf("Condition.%s", diff.Name),
 			Desired: diff.Desired,
 			Actual:  diff.Actual,
+		}
+	}
+
+	if !reflect.DeepEqual(in.SearchQuery, actualLucene.SearchQuery) {
+		return false, utils.Diff{
+			Name:    "SearchQuery",
+			Desired: utils.PointerToString(in.SearchQuery),
+			Actual:  utils.PointerToString(actualLucene.SearchQuery),
 		}
 	}
 
@@ -1762,48 +1742,20 @@ type Promql struct {
 	Conditions PromqlConditions `json:"conditions,omitempty"`
 }
 
-func (in *Promql) DeepEqual(condition *alerts.AlertCondition, data *notificationsAlertTypeData) (bool, utils.Diff) {
-	var conditionParams *alerts.ConditionParameters
-	var actualAlertWhen string
-	switch condition := condition.GetCondition().(type) {
-	case *alerts.AlertCondition_LessThan:
-		actualAlertWhen = "Less"
-		conditionParams = condition.LessThan.GetParameters()
-	case *alerts.AlertCondition_MoreThan:
-		conditionParams = condition.MoreThan.GetParameters()
-		actualAlertWhen = "More"
-	}
-
-	promqlParams := conditionParams.GetMetricAlertPromqlParameters()
-	if promqlParams == nil {
+func (in *Promql) DeepEqual(actualPromql Promql) (bool, utils.Diff) {
+	if equal, diff := in.Conditions.DeepEqual(actualPromql.Conditions); !equal {
 		return false, utils.Diff{
-			Name:    "Type",
-			Desired: "Promql",
-			Actual:  "Lucene",
-		}
-	}
-
-	if alertWhen := string(in.Conditions.AlertWhen); actualAlertWhen != alertWhen {
-		return false, utils.Diff{
-			Name:    "Promql.Conditions.AlertWhen",
-			Desired: alertWhen,
-			Actual:  actualAlertWhen,
-		}
-	}
-
-	if searchQuery, actualSearchQuery := in.SearchQuery, conditionParams.MetricAlertPromqlParameters.PromqlText.GetValue(); searchQuery != actualSearchQuery {
-		return false, utils.Diff{
-			Name:    "Promql.SearchQuery",
-			Desired: searchQuery,
-			Actual:  actualSearchQuery,
-		}
-	}
-
-	if equal, diff := in.Conditions.DeepEqual(conditionParams, data); !equal {
-		return false, utils.Diff{
-			Name:    fmt.Sprintf("Promql.Conditions.%s", diff.Name),
+			Name:    fmt.Sprintf("Condition.%s", diff.Name),
 			Desired: diff.Desired,
 			Actual:  diff.Actual,
+		}
+	}
+
+	if in.SearchQuery != actualPromql.SearchQuery {
+		return false, utils.Diff{
+			Name:    "SearchQuery",
+			Desired: in.SearchQuery,
+			Actual:  actualPromql.SearchQuery,
 		}
 	}
 
@@ -1816,15 +1768,16 @@ type Tracing struct {
 	Conditions TracingCondition `json:"conditions,omitempty"`
 }
 
-func (in *Tracing) DeepEqual(filters *alerts.TracingAlert, condition *alerts.AlertCondition, data *notificationsAlertTypeData) (bool, utils.Diff) {
-	if equal, diff := in.Conditions.DeepEqual(condition, data); !equal {
+func (in *Tracing) DeepEqual(actualTracing Tracing) (bool, utils.Diff) {
+	if equal, diff := in.Conditions.DeepEqual(actualTracing.Conditions); !equal {
 		return false, utils.Diff{
 			Name:    fmt.Sprintf("Conditions.%s", diff.Name),
 			Desired: diff.Desired,
 			Actual:  diff.Actual,
 		}
 	}
-	if equal, diff := in.Filters.DeepEqual(filters); !equal {
+
+	if equal, diff := in.Filters.DeepEqual(actualTracing.Filters); !equal {
 		return false, utils.Diff{
 			Name:    fmt.Sprintf("Filters.%s", diff.Name),
 			Desired: diff.Desired,
@@ -1839,8 +1792,8 @@ type Flow struct {
 	Stages []FlowStage `json:"stages,omitempty"`
 }
 
-func (in *Flow) DeepEqual(flow *alerts.FlowCondition) (bool, utils.Diff) {
-	if stages, actualStages := in.Stages, flow.Stages; len(stages) != len(actualStages) {
+func (in *Flow) DeepEqual(actualFlow Flow) (bool, utils.Diff) {
+	if stages, actualStages := in.Stages, actualFlow.Stages; len(stages) != len(actualStages) {
 		return false, utils.Diff{
 			Name:    "Stages",
 			Desired: stages,
@@ -1877,124 +1830,47 @@ type StandardConditions struct {
 	ManageUndetectedValues *ManageUndetectedValues `json:"manageUndetectedValues,omitempty"`
 }
 
-func (in *StandardConditions) DeepEqual(condition *alerts.AlertCondition, data *notificationsAlertTypeData) (bool, utils.Diff) {
-	var conditionParams *alerts.ConditionParameters
-	switch condition.GetCondition().(type) {
-	case *alerts.AlertCondition_LessThan:
-		conditionParams = condition.GetLessThan().GetParameters()
-		if alertWhen := in.AlertWhen; alertWhen != "Less" {
-			return false, utils.Diff{
-				Name:    "AlertWhen",
-				Desired: alertWhen,
-				Actual:  "Less",
-			}
-		}
-		if threshold, actualThreshold := float64(*(in.Threshold)), conditionParams.GetThreshold().GetValue(); threshold != actualThreshold {
-			return false, utils.Diff{
-				Name:    "Threshold",
-				Desired: threshold,
-				Actual:  actualThreshold,
-			}
-		}
-		if timeWindow, actualTimeWindow := alertSchemaTimeWindowToProtoTimeWindow[string(*in.TimeWindow)], conditionParams.GetTimeframe(); timeWindow != actualTimeWindow {
-			return false, utils.Diff{
-				Name:    "TimeWindow",
-				Desired: timeWindow,
-				Actual:  actualTimeWindow,
-			}
-		}
-
-		if manageUndetectedValues, actualManageUndetectedValues := in.ManageUndetectedValues, conditionParams.GetRelatedExtendedData(); manageUndetectedValues == nil && actualManageUndetectedValues != nil {
-			if actualShouldTriggerDeadman, actualCleanupDeadmanDuration := actualManageUndetectedValues.GetShouldTriggerDeadman().GetValue(), actualManageUndetectedValues.GetCleanupDeadmanDuration(); actualShouldTriggerDeadman && actualCleanupDeadmanDuration == alerts.CleanupDeadmanDuration_CLEANUP_DEADMAN_DURATION_NEVER_OR_UNSPECIFIED {
-				autoRetireRatio := AutoRetireRatio("Never")
-				in.ManageUndetectedValues = &ManageUndetectedValues{
-					EnableTriggeringOnUndetectedValues: true,
-					AutoRetireRatio:                    &autoRetireRatio,
-				}
-			} else {
-				return false, utils.Diff{
-					Name:    "ManageUndetectedValues",
-					Desired: manageUndetectedValues,
-					Actual:  *actualManageUndetectedValues,
-				}
-			}
-		} else if actualManageUndetectedValues == nil {
-			if manageUndetectedValues != nil {
-				return false, utils.Diff{
-					Name:    "ManageUndetectedValues",
-					Desired: *manageUndetectedValues,
-					Actual:  actualManageUndetectedValues,
-				}
-			}
-		} else if equal, diff := manageUndetectedValues.DeepEqual(actualManageUndetectedValues); !equal {
-			return false, utils.Diff{
-				Name:    fmt.Sprintf("ManageUndetectedValues.%s", diff.Name),
-				Desired: diff.Desired,
-				Actual:  diff.Actual,
-			}
-		}
-
-	case *alerts.AlertCondition_MoreThan:
-		conditionParams = condition.GetMoreThan().GetParameters()
-		if alertWhen := in.AlertWhen; alertWhen != "More" {
-			return false, utils.Diff{
-				Name:    "AlertWhen",
-				Desired: alertWhen,
-				Actual:  "More",
-			}
-		}
-		if threshold, actualThreshold := float64(*(in.Threshold)), conditionParams.GetThreshold().GetValue(); threshold != actualThreshold {
-			return false, utils.Diff{
-				Name:    "Threshold",
-				Desired: threshold,
-				Actual:  actualThreshold,
-			}
-		}
-		if timeWindow, actualTimeWindow := alertSchemaTimeWindowToProtoTimeWindow[string(*in.TimeWindow)], conditionParams.GetTimeframe(); timeWindow != actualTimeWindow {
-			return false, utils.Diff{
-				Name:    "TimeWindow",
-				Desired: timeWindow,
-				Actual:  actualTimeWindow,
-			}
-		}
-	case *alerts.AlertCondition_MoreThanUsual:
-		conditionParams = condition.GetMoreThanUsual().GetParameters()
-		if alertWhen := in.AlertWhen; alertWhen != "MoreThanUsual" {
-			return false, utils.Diff{
-				Name:    "AlertWhen",
-				Desired: alertWhen,
-				Actual:  "MoreThanUsual",
-			}
-		}
-		if threshold, actualThreshold := float64(*(in.Threshold)), conditionParams.GetThreshold().GetValue(); threshold != actualThreshold {
-			return false, utils.Diff{
-				Name:    "Threshold",
-				Desired: threshold,
-				Actual:  actualThreshold,
-			}
-		}
-	case *alerts.AlertCondition_Immediate:
-		conditionParams = condition.GetMoreThanUsual().GetParameters()
-		if alertWhen := in.AlertWhen; alertWhen != "Immediately" {
-			return false, utils.Diff{
-				Name:    "AlertWhen",
-				Desired: alertWhen,
-				Actual:  "Immediately",
-			}
+func (in *StandardConditions) DeepEqual(actualCondition StandardConditions) (bool, utils.Diff) {
+	if in.AlertWhen != actualCondition.AlertWhen {
+		return false, utils.Diff{
+			Name:    "AlertWhen",
+			Desired: in.AlertWhen,
+			Actual:  actualCondition.AlertWhen,
 		}
 	}
 
-	if groupBy, actualGroupBy := in.GroupBy, utils.WrappedStringSliceToStringSlice(conditionParams.GetGroupBy()); !utils.SlicesWithUniqueValuesEqual(groupBy, actualGroupBy) {
+	if !reflect.DeepEqual(in.Threshold, actualCondition.Threshold) {
+		return false, utils.Diff{
+			Name:    "Threshold",
+			Desired: utils.PointerToString(in.Threshold),
+			Actual:  utils.PointerToString(actualCondition.Threshold),
+		}
+	}
+
+	if !reflect.DeepEqual(in.TimeWindow, actualCondition.TimeWindow) {
+		return false, utils.Diff{
+			Name:    "TimeWindow",
+			Desired: utils.PointerToString(in.TimeWindow),
+			Actual:  utils.PointerToString(actualCondition.TimeWindow),
+		}
+	}
+
+	if equal, diff := in.ManageUndetectedValues.DeepEqual(actualCondition.ManageUndetectedValues); !equal {
+		return false, utils.Diff{
+			Name:    diff.Name,
+			Desired: diff.Desired,
+			Actual:  diff.Actual,
+		}
+	}
+
+	if !utils.SlicesWithUniqueValuesEqual(in.GroupBy, actualCondition.GroupBy) {
 		return false, utils.Diff{
 			Name:    "GroupBy",
-			Desired: groupBy,
-			Actual:  actualGroupBy,
+			Desired: in.GroupBy,
+			Actual:  actualCondition.GroupBy,
 		}
 	}
 
-	data.notifyOnlyOnTriggeredGroupByValues = conditionParams.NotifyGroupByOnlyAlerts
-	data.onTriggerAndResolved = conditionParams.NotifyOnResolved
-	data.ignoreInfinity = conditionParams.IgnoreInfinity
 	return true, utils.Diff{}
 }
 
@@ -2002,6 +1878,9 @@ type RatioConditions struct {
 	AlertWhen AlertWhen `json:"alertWhen,omitempty"`
 
 	Ratio resource.Quantity `json:"ratio,omitempty"`
+
+	//+kubebuilder:default=false
+	IgnoreInfinity bool `json:"ignoreInfinity,omitempty"`
 
 	TimeWindow TimeWindow `json:"timeWindow,omitempty"`
 
@@ -2015,99 +1894,46 @@ type RatioConditions struct {
 	ManageUndetectedValues *ManageUndetectedValues `json:"manageUndetectedValues,omitempty"`
 }
 
-func (in *RatioConditions) DeepEqual(condition *alerts.AlertCondition, actualQ2GroupBy []*wrapperspb.StringValue, data *notificationsAlertTypeData) (bool, utils.Diff) {
-	var conditionParams *alerts.ConditionParameters
-
-	switch condition.GetCondition().(type) {
-	case *alerts.AlertCondition_LessThan:
-		conditionParams = condition.GetLessThan().GetParameters()
-		if alertWhen := in.AlertWhen; alertWhen != "Less" {
-			return false, utils.Diff{
-				Name:    "AlertWhen",
-				Desired: alertWhen,
-				Actual:  "Less",
-			}
-		}
-
-		if manageUndetectedValues, actualManageUndetectedValues := in.ManageUndetectedValues, conditionParams.GetRelatedExtendedData(); manageUndetectedValues == nil && actualManageUndetectedValues != nil {
-			if actualShouldTriggerDeadman, actualCleanupDeadmanDuration := actualManageUndetectedValues.GetShouldTriggerDeadman().GetValue(), actualManageUndetectedValues.GetCleanupDeadmanDuration(); actualShouldTriggerDeadman && actualCleanupDeadmanDuration == alerts.CleanupDeadmanDuration_CLEANUP_DEADMAN_DURATION_NEVER_OR_UNSPECIFIED {
-				autoRetireRatio := AutoRetireRatio("Never")
-				in.ManageUndetectedValues = &ManageUndetectedValues{
-					EnableTriggeringOnUndetectedValues: true,
-					AutoRetireRatio:                    &autoRetireRatio,
-				}
-			} else {
-				return false, utils.Diff{
-					Name:    "ManageUndetectedValues",
-					Desired: manageUndetectedValues,
-					Actual:  *actualManageUndetectedValues,
-				}
-			}
-		} else if actualManageUndetectedValues == nil {
-			if manageUndetectedValues != nil {
-				return false, utils.Diff{
-					Name:    "ManageUndetectedValues",
-					Desired: *manageUndetectedValues,
-					Actual:  actualManageUndetectedValues,
-				}
-			}
-		} else if equal, diff := manageUndetectedValues.DeepEqual(actualManageUndetectedValues); !equal {
-			return false, utils.Diff{
-				Name:    fmt.Sprintf("ManageUndetectedValues.%s", diff.Name),
-				Desired: diff.Desired,
-				Actual:  diff.Actual,
-			}
-		}
-
-	case *alerts.AlertCondition_MoreThan:
-		conditionParams = condition.GetMoreThan().GetParameters()
-		if alertWhen := in.AlertWhen; alertWhen != "More" {
-			return false, utils.Diff{
-				Name:    "AlertWhen",
-				Desired: alertWhen,
-				Actual:  "More",
-			}
-		}
-	}
-
-	if threshold, actualThreshold := in.Ratio.AsApproximateFloat64(), conditionParams.GetThreshold().GetValue(); threshold != actualThreshold {
+func (in *RatioConditions) DeepEqual(actualCondition RatioConditions) (bool, utils.Diff) {
+	if in.AlertWhen != actualCondition.AlertWhen {
 		return false, utils.Diff{
-			Name:    "Threshold",
-			Desired: threshold,
-			Actual:  actualThreshold,
+			Name:    "AlertWhen",
+			Desired: in.AlertWhen,
+			Actual:  actualCondition.AlertWhen,
 		}
 	}
-	if timeWindow, actualTimeWindow := alertSchemaTimeWindowToProtoTimeWindow[string(in.TimeWindow)], conditionParams.GetTimeframe(); timeWindow != actualTimeWindow {
+
+	if equal, diff := in.ManageUndetectedValues.DeepEqual(actualCondition.ManageUndetectedValues); !equal {
+		return false, utils.Diff{
+			Name:    diff.Name,
+			Desired: diff.Desired,
+			Actual:  diff.Actual,
+		}
+	}
+
+	if !in.Ratio.Equal(actualCondition.Ratio) {
+		return false, utils.Diff{
+			Name:    "Ratio",
+			Desired: in.Ratio,
+			Actual:  actualCondition.Ratio,
+		}
+	}
+
+	if in.TimeWindow != actualCondition.TimeWindow {
 		return false, utils.Diff{
 			Name:    "TimeWindow",
-			Desired: timeWindow,
-			Actual:  actualTimeWindow,
+			Desired: in.TimeWindow,
+			Actual:  actualCondition.TimeWindow,
 		}
 	}
 
-	if groupByFor := in.GroupByFor; groupByFor != nil && *groupByFor == "Q1" || *groupByFor == "Both" {
-		if groupBy, actualGroupBy := in.GroupBy, utils.WrappedStringSliceToStringSlice(conditionParams.GetGroupBy()); !utils.SlicesWithUniqueValuesEqual(groupBy, actualGroupBy) {
-			return false, utils.Diff{
-				Name:    "GroupBy (Q1)",
-				Desired: groupBy,
-				Actual:  actualGroupBy,
-			}
+	if !reflect.DeepEqual(in.GroupByFor, actualCondition.GroupByFor) {
+		return false, utils.Diff{
+			Name:    "GroupByFor",
+			Desired: utils.PointerToString(in.GroupByFor),
+			Actual:  utils.PointerToString(actualCondition.GroupByFor),
 		}
 	}
-
-	if groupByFor := in.GroupByFor; groupByFor != nil && *groupByFor == "Q2" || *groupByFor == "Both" {
-		if groupBy, actualGroupBy := in.GroupBy, utils.WrappedStringSliceToStringSlice(actualQ2GroupBy); !utils.SlicesWithUniqueValuesEqual(groupBy, actualGroupBy) {
-			return false, utils.Diff{
-				Name:    "GroupBy (Q2)",
-				Desired: groupBy,
-				Actual:  actualGroupBy,
-			}
-		}
-	}
-
-	data.notifyOnlyOnTriggeredGroupByValues = conditionParams.NotifyGroupByOnlyAlerts
-	data.onTriggerAndResolved = conditionParams.NotifyOnResolved
-	data.ignoreInfinity = conditionParams.IgnoreInfinity
 
 	return true, utils.Diff{}
 }
@@ -2118,27 +1944,20 @@ type NewValueConditions struct {
 	TimeWindow NewValueTimeWindow `json:"timeWindow,omitempty"`
 }
 
-func (in *NewValueConditions) DeepEqual(condition *alerts.AlertCondition_NewValue) (bool, utils.Diff) {
-	conditionParams := condition.NewValue.GetParameters()
-
-	if key, actualKeys := in.Key, conditionParams.GetGroupBy(); len(actualKeys) == 0 {
+func (in *NewValueConditions) DeepEqual(actualConditions NewValueConditions) (bool, utils.Diff) {
+	if in.Key != actualConditions.Key {
 		return false, utils.Diff{
 			Name:    "Key",
 			Desired: in.Key,
-			Actual:  nil,
-		}
-	} else if actualKey := actualKeys[0].GetValue(); key != actualKey {
-		return false, utils.Diff{
-			Name:    "Key",
-			Desired: key,
-			Actual:  actualKey,
+			Actual:  actualConditions.Key,
 		}
 	}
-	if timeWindow, actualTimeWindow := alertSchemaTimeWindowToProtoTimeWindow[string(in.TimeWindow)], conditionParams.GetTimeframe(); timeWindow != actualTimeWindow {
+
+	if in.TimeWindow != actualConditions.TimeWindow {
 		return false, utils.Diff{
 			Name:    "TimeWindow",
-			Desired: timeWindow,
-			Actual:  actualTimeWindow,
+			Desired: in.TimeWindow,
+			Actual:  actualConditions.TimeWindow,
 		}
 	}
 	return true, utils.Diff{}
@@ -2158,62 +1977,47 @@ type UniqueCountConditions struct {
 	MaxUniqueValuesForGroupBy *int `json:"maxUniqueValuesForGroupBy,omitempty"`
 }
 
-func (in *UniqueCountConditions) DeepEqual(condition *alerts.AlertCondition) (bool, utils.Diff) {
-	conditionParams := condition.GetUniqueCount().GetParameters()
-
-	if key, actualKey := in.Key, conditionParams.GetCardinalityFields()[0].GetValue(); key != actualKey {
+func (in *UniqueCountConditions) DeepEqual(actualCondition UniqueCountConditions) (bool, utils.Diff) {
+	if in.Key != actualCondition.Key {
 		return false, utils.Diff{
 			Name:    "Key",
-			Desired: key,
-			Actual:  actualKey,
+			Desired: in.Key,
+			Actual:  actualCondition.Key,
 		}
 	}
-	if timeWindow, actualTimeWindow := alertSchemaTimeWindowToProtoTimeWindow[string(in.TimeWindow)], conditionParams.GetTimeframe(); timeWindow != actualTimeWindow {
+
+	if in.TimeWindow != actualCondition.TimeWindow {
 		return false, utils.Diff{
 			Name:    "TimeWindow",
-			Desired: timeWindow,
-			Actual:  actualTimeWindow,
+			Desired: in.TimeWindow,
+			Actual:  actualCondition.TimeWindow,
 		}
 	}
-	if maxUniqueValues, actualMaxUniqueValues := in.MaxUniqueValues, int(conditionParams.GetThreshold().GetValue()); maxUniqueValues != actualMaxUniqueValues {
+
+	if in.MaxUniqueValues != actualCondition.MaxUniqueValues {
 		return false, utils.Diff{
 			Name:    "MaxUniqueValues",
-			Desired: maxUniqueValues,
-			Actual:  actualMaxUniqueValues,
+			Desired: in.MaxUniqueValues,
+			Actual:  actualCondition.MaxUniqueValues,
 		}
 	}
-	if groupBy, actualGroupBys := in.GroupBy, conditionParams.GetGroupBy(); groupBy != nil && len(actualGroupBys) < 1 {
+
+	if !reflect.DeepEqual(in.GroupBy, actualCondition.GroupBy) {
 		return false, utils.Diff{
 			Name:    "GroupBy",
-			Desired: *groupBy,
-			Actual:  actualGroupBys,
-		}
-	} else if actualGroupBy := actualGroupBys[0].GetValue(); groupBy == nil {
-		return false, utils.Diff{
-			Name:    "GroupBy",
-			Desired: groupBy,
-			Actual:  actualGroupBy,
-		}
-	} else if groupBy := *groupBy; actualGroupBy != groupBy {
-		return false, utils.Diff{
-			Name:    "GroupBy",
-			Desired: groupBy,
-			Actual:  actualGroupBys,
+			Desired: utils.PointerToString(in.GroupBy),
+			Actual:  utils.PointerToString(actualCondition.GroupBy),
 		}
 	}
-	if maxUniqueValuesForGroupBy, actualMaxUniqueValuesForGroupBy := in.MaxUniqueValuesForGroupBy, conditionParams.GetMaxUniqueCountValuesForGroupByKey(); maxUniqueValuesForGroupBy == nil && actualMaxUniqueValuesForGroupBy != nil {
+
+	if !reflect.DeepEqual(in.MaxUniqueValuesForGroupBy, actualCondition.MaxUniqueValuesForGroupBy) {
 		return false, utils.Diff{
 			Name:    "MaxUniqueValuesForGroupBy",
-			Desired: maxUniqueValuesForGroupBy,
-			Actual:  actualMaxUniqueValuesForGroupBy.GetValue(),
-		}
-	} else if maxUniqueValuesForGroupBy, actualMaxUniqueValuesForGroupBy := *maxUniqueValuesForGroupBy, int(actualMaxUniqueValuesForGroupBy.GetValue()); maxUniqueValuesForGroupBy != actualMaxUniqueValuesForGroupBy {
-		return false, utils.Diff{
-			Name:    "MaxUniqueValuesForGroupBy",
-			Desired: maxUniqueValuesForGroupBy,
-			Actual:  actualMaxUniqueValuesForGroupBy,
+			Desired: utils.PointerToString(in.MaxUniqueValuesForGroupBy),
+			Actual:  utils.PointerToString(actualCondition.MaxUniqueValuesForGroupBy),
 		}
 	}
+
 	return true, utils.Diff{}
 }
 
@@ -2221,6 +2025,9 @@ type TimeRelativeConditions struct {
 	AlertWhen AlertWhen `json:"alertWhen,omitempty"`
 
 	Threshold resource.Quantity `json:"threshold,omitempty"`
+
+	//+kubebuilder:default=false
+	IgnoreInfinity bool `json:"ignoreInfinity,omitempty"`
 
 	TimeWindow RelativeTimeWindow `json:"timeWindow,omitempty"`
 
@@ -2231,95 +2038,61 @@ type TimeRelativeConditions struct {
 	ManageUndetectedValues *ManageUndetectedValues `json:"manageUndetectedValues,omitempty"`
 }
 
-func (in *TimeRelativeConditions) DeepEqual(condition *alerts.AlertCondition, data *notificationsAlertTypeData) (bool, utils.Diff) {
-	var conditionParams *alerts.ConditionParameters
-
-	switch condition.GetCondition().(type) {
-	case *alerts.AlertCondition_LessThan:
-		if alertWhen := in.AlertWhen; alertWhen != "Less" {
-			return false, utils.Diff{
-				Name:    "AlertWhen",
-				Desired: alertWhen,
-				Actual:  "Less",
-			}
+func (in *TimeRelativeConditions) DeepEqual(actualCondition TimeRelativeConditions) (bool, utils.Diff) {
+	if in.AlertWhen != actualCondition.AlertWhen {
+		return false, utils.Diff{
+			Name:    "AlertWhen",
+			Desired: in.AlertWhen,
+			Actual:  actualCondition.AlertWhen,
 		}
-		conditionParams = condition.GetLessThan().GetParameters()
-
-		if manageUndetectedValues, actualManageUndetectedValues := in.ManageUndetectedValues, conditionParams.GetRelatedExtendedData(); manageUndetectedValues == nil && actualManageUndetectedValues != nil {
-			if actualShouldTriggerDeadman, actualCleanupDeadmanDuration := actualManageUndetectedValues.GetShouldTriggerDeadman().GetValue(), actualManageUndetectedValues.GetCleanupDeadmanDuration(); actualShouldTriggerDeadman && actualCleanupDeadmanDuration == alerts.CleanupDeadmanDuration_CLEANUP_DEADMAN_DURATION_NEVER_OR_UNSPECIFIED {
-				autoRetireRatio := AutoRetireRatio("Never")
-				in.ManageUndetectedValues = &ManageUndetectedValues{
-					EnableTriggeringOnUndetectedValues: true,
-					AutoRetireRatio:                    &autoRetireRatio,
-				}
-			} else {
-				return false, utils.Diff{
-					Name:    "ManageUndetectedValues",
-					Desired: manageUndetectedValues,
-					Actual:  *actualManageUndetectedValues,
-				}
-			}
-		} else if actualManageUndetectedValues == nil {
-			if manageUndetectedValues != nil {
-				return false, utils.Diff{
-					Name:    "ManageUndetectedValues",
-					Desired: *manageUndetectedValues,
-					Actual:  actualManageUndetectedValues,
-				}
-			}
-		} else if equal, diff := manageUndetectedValues.DeepEqual(actualManageUndetectedValues); !equal {
-			return false, utils.Diff{
-				Name:    fmt.Sprintf("ManageUndetectedValues.%s", diff.Name),
-				Desired: diff.Desired,
-				Actual:  diff.Actual,
-			}
-		}
-
-	case *alerts.AlertCondition_MoreThan:
-		if alertWhen := in.AlertWhen; alertWhen != "More" {
-			return false, utils.Diff{
-				Name:    "AlertWhen",
-				Desired: alertWhen,
-				Actual:  "More",
-			}
-		}
-		conditionParams = condition.GetMoreThan().GetParameters()
 	}
 
-	if threshold, actualThreshold := in.Threshold.AsApproximateFloat64(), conditionParams.GetThreshold().GetValue(); threshold != actualThreshold {
+	if equal, diff := in.ManageUndetectedValues.DeepEqual(actualCondition.ManageUndetectedValues); !equal {
+		return false, utils.Diff{
+			Name:    diff.Name,
+			Desired: diff.Desired,
+			Actual:  diff.Actual,
+		}
+	}
+
+	if !in.Threshold.Equal(actualCondition.Threshold) {
 		return false, utils.Diff{
 			Name:    "Threshold",
-			Desired: threshold,
-			Actual:  actualThreshold,
+			Desired: in.Threshold,
+			Actual:  actualCondition.Threshold,
 		}
 	}
 
-	relativeTimeWindow := alertSchemaRelativeTimeFrameToProtoTimeFrameAndRelativeTimeFrame[in.TimeWindow]
-	actualRelativeTimeWindow := protoTimeFrameAndRelativeTimeFrame{timeFrame: conditionParams.GetTimeframe(), relativeTimeFrame: conditionParams.GetRelativeTimeframe()}
-	if relativeTimeWindow != actualRelativeTimeWindow {
+	if in.TimeWindow != actualCondition.TimeWindow {
 		return false, utils.Diff{
-			Name:    "RelativeTimeWindow",
-			Desired: relativeTimeWindow,
-			Actual:  actualRelativeTimeWindow,
+			Name:    "TimeWindow",
+			Desired: in.TimeWindow,
+			Actual:  actualCondition.TimeWindow,
 		}
 	}
 
-	if groupBy, actualGroupBy := in.GroupBy, utils.WrappedStringSliceToStringSlice(conditionParams.GetGroupBy()); !utils.SlicesWithUniqueValuesEqual(groupBy, actualGroupBy) {
+	if !utils.SlicesWithUniqueValuesEqual(in.GroupBy, actualCondition.GroupBy) {
 		return false, utils.Diff{
 			Name:    "GroupBy",
-			Desired: groupBy,
-			Actual:  actualGroupBy,
+			Desired: in.GroupBy,
+			Actual:  actualCondition.GroupBy,
 		}
 	}
 
-	data.notifyOnlyOnTriggeredGroupByValues = conditionParams.NotifyGroupByOnlyAlerts
-	data.onTriggerAndResolved = conditionParams.NotifyOnResolved
-	data.ignoreInfinity = conditionParams.IgnoreInfinity
 	return true, utils.Diff{}
 }
 
 // +kubebuilder:validation:Enum=Avg;Min;Max;Sum;Count;Percentile;
 type ArithmeticOperator string
+
+const (
+	ArithmeticOperatorAvg        ArithmeticOperator = "Avg"
+	ArithmeticOperatorMin        ArithmeticOperator = "Min"
+	ArithmeticOperatorMax        ArithmeticOperator = "Max"
+	ArithmeticOperatorSum        ArithmeticOperator = "Sum"
+	ArithmeticOperatorCount      ArithmeticOperator = "Count"
+	ArithmeticOperatorPercentile ArithmeticOperator = "Percentile"
+)
 
 type LuceneConditions struct {
 	MetricField string `json:"metricField,omitempty"`
@@ -2353,119 +2126,86 @@ type LuceneConditions struct {
 	ManageUndetectedValues *ManageUndetectedValues `json:"manageUndetectedValues,omitempty"`
 }
 
-func (in *LuceneConditions) DeepEqual(conditionParams *alerts.ConditionParameters, data *notificationsAlertTypeData) (bool, utils.Diff) {
-	if threshold, actualThreshold := in.Threshold.AsApproximateFloat64(), conditionParams.Threshold.GetValue(); threshold != actualThreshold {
+func (in *LuceneConditions) DeepEqual(actualCondition LuceneConditions) (bool, utils.Diff) {
+	if !in.Threshold.Equal(actualCondition.Threshold) {
 		return false, utils.Diff{
 			Name:    "Threshold",
-			Desired: threshold,
-			Actual:  actualThreshold,
+			Desired: in.Threshold,
+			Actual:  actualCondition.Threshold,
 		}
 	}
 
-	if groupBy, actualGroupBy := in.GroupBy, utils.WrappedStringSliceToStringSlice(conditionParams.GetGroupBy()); !utils.SlicesWithUniqueValuesEqual(groupBy, actualGroupBy) {
+	if !utils.SlicesWithUniqueValuesEqual(in.GroupBy, actualCondition.GroupBy) {
 		return false, utils.Diff{
 			Name:    "GroupBy",
-			Desired: groupBy,
-			Actual:  actualGroupBy,
+			Desired: in.GroupBy,
+			Actual:  actualCondition.GroupBy,
 		}
 	}
 
-	if timeWindow, actualTimeWindow := alertSchemaTimeWindowToProtoTimeWindow[string(in.TimeWindow)], conditionParams.GetTimeframe(); timeWindow != actualTimeWindow {
+	if in.TimeWindow != actualCondition.TimeWindow {
 		return false, utils.Diff{
 			Name:    "TimeWindow",
-			Desired: timeWindow,
-			Actual:  actualTimeWindow,
+			Desired: in.TimeWindow,
+			Actual:  actualCondition.TimeWindow,
 		}
 	}
 
-	metricParams := conditionParams.GetMetricAlertParameters()
-
-	if metricField, actualMetricField := in.MetricField, metricParams.MetricField.GetValue(); metricField != actualMetricField {
+	if in.MetricField != actualCondition.MetricField {
 		return false, utils.Diff{
 			Name:    "MetricField",
-			Desired: metricField,
-			Actual:  actualMetricField,
+			Desired: in.MetricField,
+			Actual:  actualCondition.MetricField,
 		}
 	}
 
-	if arithmeticOperator, actualArithmeticOperator := alertSchemaArithmeticOperatorToProtoArithmeticOperator[in.ArithmeticOperator], metricParams.GetArithmeticOperator(); arithmeticOperator != actualArithmeticOperator {
+	if in.ArithmeticOperator != actualCondition.ArithmeticOperator {
 		return false, utils.Diff{
 			Name:    "ArithmeticOperator",
-			Desired: arithmeticOperator,
-			Actual:  actualArithmeticOperator,
+			Desired: in.ArithmeticOperator,
+			Actual:  actualCondition.ArithmeticOperator,
 		}
 	}
 
-	if arithmeticOperatorModifier, actualArithmeticOperatorModifier := in.ArithmeticOperatorModifier, metricParams.ArithmeticOperatorModifier; arithmeticOperatorModifier == nil && actualArithmeticOperatorModifier != nil {
+	if !reflect.DeepEqual(in.ArithmeticOperatorModifier, actualCondition.ArithmeticOperatorModifier) {
 		return false, utils.Diff{
 			Name:    "ArithmeticOperatorModifier",
-			Desired: arithmeticOperatorModifier,
-			Actual:  *actualArithmeticOperatorModifier,
-		}
-	} else if arithmeticOperatorModifier, actualArithmeticOperatorModifier := *arithmeticOperatorModifier, int(actualArithmeticOperatorModifier.GetValue()); arithmeticOperatorModifier != actualArithmeticOperatorModifier {
-		return false, utils.Diff{
-			Name:    "ArithmeticOperatorModifier",
-			Desired: arithmeticOperatorModifier,
-			Actual:  actualArithmeticOperatorModifier,
+			Desired: utils.PointerToString(in.ArithmeticOperatorModifier),
+			Actual:  utils.PointerToString(actualCondition.ArithmeticOperatorModifier),
 		}
 	}
 
-	if sampleThresholdPercentage, actualSampleThresholdPercentage := in.SampleThresholdPercentage, int(metricParams.SampleThresholdPercentage.GetValue()); sampleThresholdPercentage != actualSampleThresholdPercentage {
+	if in.SampleThresholdPercentage != actualCondition.SampleThresholdPercentage {
 		return false, utils.Diff{
 			Name:    "SampleThresholdPercentage",
-			Desired: sampleThresholdPercentage,
-			Actual:  actualSampleThresholdPercentage,
+			Desired: in.SampleThresholdPercentage,
+			Actual:  actualCondition.SampleThresholdPercentage,
 		}
 	}
 
-	if replaceMissingValueWithZero, actualReplaceMissingValueWithZero := in.ReplaceMissingValueWithZero, metricParams.GetSwapNullValues().GetValue(); replaceMissingValueWithZero != actualReplaceMissingValueWithZero {
+	if in.ReplaceMissingValueWithZero != actualCondition.ReplaceMissingValueWithZero {
 		return false, utils.Diff{
 			Name:    "MissingValueWithZero",
-			Desired: replaceMissingValueWithZero,
-			Actual:  actualReplaceMissingValueWithZero,
+			Desired: in.ReplaceMissingValueWithZero,
+			Actual:  actualCondition.ReplaceMissingValueWithZero,
 		}
 	}
 
-	if minNonNullValuesPercentage, actualMinNonNullValuesPercentage := in.MinNonNullValuesPercentage, int(metricParams.GetNonNullPercentage().GetValue()); minNonNullValuesPercentage != actualMinNonNullValuesPercentage {
+	if !reflect.DeepEqual(in.MinNonNullValuesPercentage, actualCondition.MinNonNullValuesPercentage) {
 		return false, utils.Diff{
 			Name:    "MinNonNullValuesPercentage",
-			Desired: minNonNullValuesPercentage,
-			Actual:  actualMinNonNullValuesPercentage,
+			Desired: utils.PointerToString(in.MinNonNullValuesPercentage),
+			Actual:  utils.PointerToString(actualCondition.MinNonNullValuesPercentage),
 		}
 	}
 
-	if manageUndetectedValues, actualManageUndetectedValues := in.ManageUndetectedValues, conditionParams.GetRelatedExtendedData(); manageUndetectedValues == nil && actualManageUndetectedValues != nil {
-		if actualShouldTriggerDeadman, actualCleanupDeadmanDuration := actualManageUndetectedValues.GetShouldTriggerDeadman().GetValue(), actualManageUndetectedValues.GetCleanupDeadmanDuration(); actualShouldTriggerDeadman && actualCleanupDeadmanDuration == alerts.CleanupDeadmanDuration_CLEANUP_DEADMAN_DURATION_NEVER_OR_UNSPECIFIED {
-			autoRetireRatio := AutoRetireRatio("Never")
-			in.ManageUndetectedValues = &ManageUndetectedValues{
-				EnableTriggeringOnUndetectedValues: true,
-				AutoRetireRatio:                    &autoRetireRatio,
-			}
-		} else {
-			return false, utils.Diff{
-				Name:    "ManageUndetectedValues",
-				Desired: manageUndetectedValues,
-				Actual:  *actualManageUndetectedValues,
-			}
-		}
-	} else if actualManageUndetectedValues == nil {
-		if manageUndetectedValues != nil {
-			return false, utils.Diff{
-				Name:    "ManageUndetectedValues",
-				Desired: *manageUndetectedValues,
-				Actual:  actualManageUndetectedValues,
-			}
-		}
-	} else if equal, diff := manageUndetectedValues.DeepEqual(actualManageUndetectedValues); !equal {
+	if equal, diff := in.ManageUndetectedValues.DeepEqual(actualCondition.ManageUndetectedValues); !equal {
 		return false, utils.Diff{
-			Name:    fmt.Sprintf("ManageUndetectedValues.%s", diff.Name),
+			Name:    diff.Name,
 			Desired: diff.Desired,
 			Actual:  diff.Actual,
 		}
 	}
-
-	data.notifyOnlyOnTriggeredGroupByValues = conditionParams.NotifyGroupByOnlyAlerts
-	data.onTriggerAndResolved = conditionParams.NotifyOnResolved
 
 	return true, utils.Diff{}
 }
@@ -2495,87 +2235,54 @@ type PromqlConditions struct {
 	ManageUndetectedValues *ManageUndetectedValues `json:"manageUndetectedValues,omitempty"`
 }
 
-func (in *PromqlConditions) DeepEqual(conditionParams *alerts.ConditionParameters, data *notificationsAlertTypeData) (bool, utils.Diff) {
-	if threshold, actualThreshold := in.Threshold.AsApproximateFloat64(), conditionParams.Threshold.GetValue(); threshold != actualThreshold {
+func (in *PromqlConditions) DeepEqual(actualCondition PromqlConditions) (bool, utils.Diff) {
+	if !in.Threshold.Equal(actualCondition.Threshold) {
 		return false, utils.Diff{
 			Name:    "Threshold",
-			Desired: threshold,
-			Actual:  actualThreshold,
+			Desired: in.Threshold,
+			Actual:  actualCondition.Threshold,
 		}
 	}
 
-	if groupBy, actualGroupBy := in.GroupBy, utils.WrappedStringSliceToStringSlice(conditionParams.GetGroupBy()); !utils.SlicesWithUniqueValuesEqual(groupBy, actualGroupBy) {
+	if !utils.SlicesWithUniqueValuesEqual(in.GroupBy, actualCondition.GroupBy) {
 		return false, utils.Diff{
 			Name:    "GroupBy",
-			Desired: groupBy,
-			Actual:  actualGroupBy,
+			Desired: in.GroupBy,
+			Actual:  actualCondition.GroupBy,
 		}
 	}
 
-	if timeWindow, actualTimeWindow := alertSchemaTimeWindowToProtoTimeWindow[string(in.TimeWindow)], conditionParams.GetTimeframe(); timeWindow != actualTimeWindow {
+	if in.TimeWindow != actualCondition.TimeWindow {
 		return false, utils.Diff{
 			Name:    "TimeWindow",
-			Desired: timeWindow,
-			Actual:  actualTimeWindow,
+			Desired: in.TimeWindow,
+			Actual:  actualCondition.TimeWindow,
 		}
 	}
 
-	metricParams := conditionParams.GetMetricAlertPromqlParameters()
-
-	if sampleThresholdPercentage, actualSampleThresholdPercentage := in.SampleThresholdPercentage, int(metricParams.GetSampleThresholdPercentage().GetValue()); sampleThresholdPercentage != actualSampleThresholdPercentage {
+	if in.SampleThresholdPercentage != actualCondition.SampleThresholdPercentage {
 		return false, utils.Diff{
 			Name:    "SampleThresholdPercentage",
-			Desired: sampleThresholdPercentage,
-			Actual:  actualSampleThresholdPercentage,
+			Desired: in.SampleThresholdPercentage,
+			Actual:  actualCondition.SampleThresholdPercentage,
 		}
 	}
 
-	if minNonNullValuesPercentage, actualMinNonNullValuesPercentage := in.MinNonNullValuesPercentage, metricParams.GetNonNullPercentage(); minNonNullValuesPercentage == nil && actualMinNonNullValuesPercentage != nil {
+	if !reflect.DeepEqual(in.MinNonNullValuesPercentage, actualCondition.MinNonNullValuesPercentage) {
 		return false, utils.Diff{
 			Name:    "MinNonNullValuesPercentage",
-			Desired: minNonNullValuesPercentage,
-			Actual:  actualMinNonNullValuesPercentage.GetValue(),
-		}
-	} else if minNonNullValuesPercentage, actualMinNonNullValuesPercentage := *minNonNullValuesPercentage, int(actualMinNonNullValuesPercentage.GetValue()); minNonNullValuesPercentage != actualMinNonNullValuesPercentage {
-		return false, utils.Diff{
-			Name:    "MinNonNullValuesPercentage",
-			Desired: minNonNullValuesPercentage,
-			Actual:  actualMinNonNullValuesPercentage,
+			Desired: utils.PointerToString(in.MinNonNullValuesPercentage),
+			Actual:  utils.PointerToString(actualCondition.MinNonNullValuesPercentage),
 		}
 	}
 
-	if manageUndetectedValues, actualManageUndetectedValues := in.ManageUndetectedValues, conditionParams.GetRelatedExtendedData(); manageUndetectedValues == nil && actualManageUndetectedValues != nil {
-		if actualShouldTriggerDeadman, actualCleanupDeadmanDuration := actualManageUndetectedValues.GetShouldTriggerDeadman().GetValue(), actualManageUndetectedValues.GetCleanupDeadmanDuration(); actualShouldTriggerDeadman && actualCleanupDeadmanDuration == alerts.CleanupDeadmanDuration_CLEANUP_DEADMAN_DURATION_NEVER_OR_UNSPECIFIED {
-			autoRetireRatio := AutoRetireRatio("Never")
-			in.ManageUndetectedValues = &ManageUndetectedValues{
-				EnableTriggeringOnUndetectedValues: true,
-				AutoRetireRatio:                    &autoRetireRatio,
-			}
-		} else {
-			return false, utils.Diff{
-				Name:    "ManageUndetectedValues",
-				Desired: manageUndetectedValues,
-				Actual:  *actualManageUndetectedValues,
-			}
-		}
-	} else if actualManageUndetectedValues == nil {
-		if manageUndetectedValues != nil {
-			return false, utils.Diff{
-				Name:    "ManageUndetectedValues",
-				Desired: *manageUndetectedValues,
-				Actual:  actualManageUndetectedValues,
-			}
-		}
-	} else if equal, diff := manageUndetectedValues.DeepEqual(actualManageUndetectedValues); !equal {
+	if equal, diff := in.ManageUndetectedValues.DeepEqual(actualCondition.ManageUndetectedValues); !equal {
 		return false, utils.Diff{
-			Name:    fmt.Sprintf("ManageUndetectedValues.%s", diff.Name),
+			Name:    diff.Name,
 			Desired: diff.Desired,
 			Actual:  diff.Actual,
 		}
 	}
-
-	data.notifyOnlyOnTriggeredGroupByValues = conditionParams.NotifyGroupByOnlyAlerts
-	data.onTriggerAndResolved = conditionParams.NotifyOnResolved
 
 	return true, utils.Diff{}
 }
@@ -2593,53 +2300,36 @@ type TracingCondition struct {
 	GroupBy []string `json:"groupBy,omitempty"`
 }
 
-func (in *TracingCondition) DeepEqual(condition *alerts.AlertCondition, data *notificationsAlertTypeData) (bool, utils.Diff) {
-	var conditionParams *alerts.ConditionParameters
-	switch condition := condition.GetCondition().(type) {
-	case *alerts.AlertCondition_MoreThan:
-		if alertWhen, actualAlertWhen := in.AlertWhen, "More"; string(alertWhen) != actualAlertWhen {
-			return false, utils.Diff{
-				Name:    "AlertWhen",
-				Desired: alertWhen,
-				Actual:  actualAlertWhen,
-			}
+func (in *TracingCondition) DeepEqual(actualCondition TracingCondition) (bool, utils.Diff) {
+	if in.AlertWhen != actualCondition.AlertWhen {
+		return false, utils.Diff{
+			Name:    "AlertWhen",
+			Desired: in.AlertWhen,
+			Actual:  actualCondition.AlertWhen,
 		}
-		conditionParams = condition.MoreThan.GetParameters()
-		if threshold, actualThreshold := float64(*in.Threshold), conditionParams.GetThreshold().GetValue(); threshold != actualThreshold {
-			return false, utils.Diff{
-				Name:    "Threshold",
-				Desired: threshold,
-				Actual:  actualThreshold,
-			}
+	}
+
+	if !reflect.DeepEqual(in.Threshold, actualCondition.Threshold) {
+		return false, utils.Diff{
+			Name:    "Threshold",
+			Desired: utils.PointerToString(in.Threshold),
+			Actual:  utils.PointerToString(actualCondition.Threshold),
 		}
-		if timeWindow, actualTimeWindow := in.TimeWindow, conditionParams.GetTimeframe(); timeWindow == nil {
-			return false, utils.Diff{
-				Name:    "TimeWindow",
-				Desired: timeWindow,
-				Actual:  actualTimeWindow,
-			}
-		} else if timeWindow := alertSchemaTimeWindowToProtoTimeWindow[string(*timeWindow)]; timeWindow != actualTimeWindow {
-			return false, utils.Diff{
-				Name:    "TimeWindow",
-				Desired: timeWindow,
-				Actual:  actualTimeWindow,
-			}
+	}
+
+	if !reflect.DeepEqual(in.TimeWindow, actualCondition.TimeWindow) {
+		return false, utils.Diff{
+			Name:    "TimeWindow",
+			Desired: utils.PointerToString(in.TimeWindow),
+			Actual:  utils.PointerToString(actualCondition.TimeWindow),
 		}
-		if groupBy, actualGroupBy := in.GroupBy, utils.WrappedStringSliceToStringSlice(conditionParams.GetGroupBy()); !utils.SlicesWithUniqueValuesEqual(groupBy, actualGroupBy) {
-			return false, utils.Diff{
-				Name:    "GroupBy",
-				Desired: groupBy,
-				Actual:  actualGroupBy,
-			}
-		}
-		data.onTriggerAndResolved = conditionParams.GetNotifyOnResolved()
-	case *alerts.AlertCondition_Immediate:
-		if alertWhen, actualAlertWhen := in.AlertWhen, "Immediately"; string(alertWhen) != actualAlertWhen {
-			return false, utils.Diff{
-				Name:    "AlertWhen",
-				Desired: alertWhen,
-				Actual:  actualAlertWhen,
-			}
+	}
+
+	if !utils.SlicesWithUniqueValuesEqual(in.GroupBy, actualCondition.GroupBy) {
+		return false, utils.Diff{
+			Name:    "GroupBy",
+			Desired: in.GroupBy,
+			Actual:  actualCondition.GroupBy,
 		}
 	}
 
@@ -2649,17 +2339,51 @@ func (in *TracingCondition) DeepEqual(condition *alerts.AlertCondition, data *no
 // +kubebuilder:validation:Enum=Never;FiveMinutes;TenMinutes;Hour;TwoHours;SixHours;TwelveHours;TwentyFourHours
 type AutoRetireRatio string
 
+const (
+	AutoRetireRatioNever           AutoRetireRatio = "Never"
+	AutoRetireRatioFiveMinutes     AutoRetireRatio = "FiveMinutes"
+	AutoRetireRatioTenMinutes      AutoRetireRatio = "TenMinutes"
+	AutoRetireRatioHour            AutoRetireRatio = "Hour"
+	AutoRetireRatioTwoHours        AutoRetireRatio = "TwoHours"
+	AutoRetireRatioSixHours        AutoRetireRatio = "SixHours"
+	AutoRetireRatioTwelveHours     AutoRetireRatio = "TwelveHours"
+	AutoRetireRatioTwentyFourHours AutoRetireRatio = "TwentyFourHours"
+)
+
 // +kubebuilder:validation:Enum=More;Less
 type AlertWhen string
+
+const (
+	AlertWhenLessThan AlertWhen = "Less"
+	AlertWhenMoreThan AlertWhen = "More"
+)
 
 // +kubebuilder:validation:Enum=More;Less;Immediately;MoreThanUsual
 type StandardAlertWhen string
 
+const (
+	StandardAlertWhenLessThan      StandardAlertWhen = "Less"
+	StandardAlertWhenMoreThan      StandardAlertWhen = "More"
+	StandardAlertWhenMoreThanUsual StandardAlertWhen = "MoreThanUsual"
+	StandardAlertWhenImmediately   StandardAlertWhen = "Immediately"
+)
+
 // +kubebuilder:validation:Enum=More;Immediately
 type TracingAlertWhen string
 
+const (
+	TracingAlertWhenMore        TracingAlertWhen = "More"
+	TracingAlertWhenImmediately TracingAlertWhen = "Immediately"
+)
+
 // +kubebuilder:validation:Enum=Q1;Q2;Both
 type GroupByFor string
+
+const (
+	GroupByForQ1   GroupByFor = "Q1"
+	GroupByForQ2   GroupByFor = "Q2"
+	GroupByForBoth GroupByFor = "Both"
+)
 
 // +kubebuilder:validation:Enum=FiveMinutes;TenMinutes;FifteenMinutes;TwentyMinutes;ThirtyMinutes;Hour;TwoHours;FourHours;SixHours;TwelveHours;TwentyFourHours;ThirtySixHours
 type TimeWindow string
@@ -2675,6 +2399,15 @@ type MetricTimeWindow string
 
 // +kubebuilder:validation:Enum=PreviousHour;SameHourYesterday;SameHourLastWeek;Yesterday;SameDayLastWeek;SameDayLastMonth;
 type RelativeTimeWindow string
+
+const (
+	RelativeTimeWindowPreviousHour      RelativeTimeWindow = "PreviousHour"
+	RelativeTimeWindowSameHourYesterday RelativeTimeWindow = "SameHourYesterday"
+	RelativeTimeWindowSameHourLastWeek  RelativeTimeWindow = "SameHourLastWeek"
+	RelativeTimeWindowYesterday         RelativeTimeWindow = "Yesterday"
+	RelativeTimeWindowSameDayLastWeek   RelativeTimeWindow = "SameDayLastWeek"
+	RelativeTimeWindowSameDayLastMonth  RelativeTimeWindow = "SameDayLastMonth"
+)
 
 type Filters struct {
 	// +optional
@@ -2708,141 +2441,128 @@ type Filters struct {
 	Alias *string `json:"alias,omitempty"`
 }
 
-func (in *Filters) DeepEqual(filters *alerts.AlertFilters) (bool, utils.Diff) {
-	if searchQuery, actualSearchQuery := in.SearchQuery, filters.GetText().GetValue(); searchQuery == nil && actualSearchQuery != "" {
+func (in *Filters) DeepEqual(actualFilters *Filters) (bool, utils.Diff) {
+	if !reflect.DeepEqual(in.SearchQuery, actualFilters.SearchQuery) {
 		return false, utils.Diff{
 			Name:    "SearchQuery",
-			Desired: searchQuery,
-			Actual:  actualSearchQuery,
-		}
-	} else if searchQuery != nil && *searchQuery != actualSearchQuery {
-		return false, utils.Diff{
-			Name:    "SearchQuery",
-			Desired: *searchQuery,
-			Actual:  actualSearchQuery,
+			Desired: utils.PointerToString(in.SearchQuery),
+			Actual:  utils.PointerToString(actualFilters.SearchQuery),
 		}
 	}
 
-	if alias, actualAlias := in.Alias, filters.GetAlias().GetValue(); alias == nil && actualAlias != "" {
-		in.Alias = new(string)
-		*in.Alias = actualAlias
-	} else if alias != nil && *alias != actualAlias {
+	if alias, actualAlias := in.Alias, actualFilters.Alias; !(alias == nil && actualAlias == nil || *actualAlias == "") && reflect.DeepEqual(alias, actualAlias) {
 		return false, utils.Diff{
 			Name:    "Alias",
-			Desired: *alias,
-			Actual:  actualAlias,
+			Desired: utils.PointerToString(in.Alias),
+			Actual:  utils.PointerToString(actualFilters.Alias),
 		}
 	}
 
-	if severities, actualSeverities := in.Severities, filters.Severities; !equalSeverities(severities, actualSeverities) {
+	if !utils.SlicesWithUniqueValuesEqual(in.Severities, actualFilters.Severities) {
 		return false, utils.Diff{
 			Name:    "Severities",
-			Desired: severities,
-			Actual:  actualSeverities,
+			Desired: in.Severities,
+			Actual:  actualFilters.Severities,
 		}
 	}
 
-	if metadata, applications, subsystems, categories, computers, classes, methods, IPs := filters.GetMetadata(), in.Applications, in.Subsystems, in.Categories, in.Computers, in.Classes, in.Methods, in.IPs; metadata == nil && len(applications) == 0 && len(subsystems) == 0 && len(categories) == 0 && len(computers) == 0 && len(classes) == 0 && len(methods) == 0 && len(IPs) == 0 {
-		return true, utils.Diff{}
-	} else if metadata == nil {
-		return false, utils.Diff{
-			Desired: *in,
-			Actual:  metadata,
-		}
-	} else if actualApplications := utils.WrappedStringSliceToStringSlice(metadata.Applications); !utils.SlicesWithUniqueValuesEqual(applications, actualApplications) {
+	if !utils.SlicesWithUniqueValuesEqual(in.Applications, actualFilters.Applications) {
 		return false, utils.Diff{
 			Name:    "Application",
-			Desired: applications,
-			Actual:  actualApplications,
+			Desired: in.Applications,
+			Actual:  actualFilters.Applications,
 		}
-	} else if actualSubsystems := utils.WrappedStringSliceToStringSlice(metadata.Subsystems); !utils.SlicesWithUniqueValuesEqual(subsystems, actualSubsystems) {
+	}
+
+	if !utils.SlicesWithUniqueValuesEqual(in.Subsystems, actualFilters.Subsystems) {
 		return false, utils.Diff{
 			Name:    "Subsystems",
-			Desired: subsystems,
-			Actual:  actualSubsystems,
+			Desired: in.Subsystems,
+			Actual:  actualFilters.Subsystems,
 		}
-	} else if actualCategories := utils.WrappedStringSliceToStringSlice(metadata.Categories); !utils.SlicesWithUniqueValuesEqual(categories, actualCategories) {
+	}
+
+	if !utils.SlicesWithUniqueValuesEqual(in.Categories, actualFilters.Categories) {
 		return false, utils.Diff{
 			Name:    "Categories",
-			Desired: categories,
-			Actual:  actualCategories,
+			Desired: in.Categories,
+			Actual:  actualFilters.Categories,
 		}
-	} else if actualComputers := utils.WrappedStringSliceToStringSlice(metadata.Computers); !utils.SlicesWithUniqueValuesEqual(computers, actualComputers) {
+	}
+
+	if !utils.SlicesWithUniqueValuesEqual(in.Computers, actualFilters.Computers) {
 		return false, utils.Diff{
 			Name:    "Computers",
-			Desired: computers,
-			Actual:  actualComputers,
+			Desired: in.Computers,
+			Actual:  actualFilters.Computers,
 		}
-	} else if actualClasses := utils.WrappedStringSliceToStringSlice(metadata.Classes); !utils.SlicesWithUniqueValuesEqual(classes, actualClasses) {
+	}
+
+	if !utils.SlicesWithUniqueValuesEqual(in.Classes, actualFilters.Classes) {
 		return false, utils.Diff{
 			Name:    "Classes",
-			Desired: classes,
-			Actual:  actualClasses,
+			Desired: in.Classes,
+			Actual:  actualFilters.Classes,
 		}
-	} else if actualMethods := utils.WrappedStringSliceToStringSlice(metadata.Methods); !utils.SlicesWithUniqueValuesEqual(methods, actualMethods) {
+	}
+
+	if !utils.SlicesWithUniqueValuesEqual(in.Methods, actualFilters.Methods) {
 		return false, utils.Diff{
 			Name:    "Methods",
-			Desired: methods,
-			Actual:  actualMethods,
+			Desired: in.Methods,
+			Actual:  actualFilters.Methods,
 		}
-	} else if actualIPs := utils.WrappedStringSliceToStringSlice(metadata.IpAddresses); !utils.SlicesWithUniqueValuesEqual(IPs, actualIPs) {
+	}
+
+	if !utils.SlicesWithUniqueValuesEqual(in.IPs, actualFilters.IPs) {
 		return false, utils.Diff{
 			Name:    "IPs",
-			Desired: IPs,
-			Actual:  actualIPs,
+			Desired: in.IPs,
+			Actual:  actualFilters.IPs,
 		}
 	}
 
 	return true, utils.Diff{}
 }
 
-func (in *RatioQ2Filters) DeepEqual(filters *alerts.AlertFilters_RatioAlert) (bool, utils.Diff) {
-	if alias, actualAlias := in.Alias, filters.GetAlias(); alias == nil && actualAlias != nil {
-		in.Alias = new(string)
-		*in.Alias = actualAlias.GetValue()
-	} else if alias, actualAlias := *alias, actualAlias.GetValue(); alias != actualAlias {
+func (in *RatioQ2Filters) DeepEqual(actualRatioQ2Filters RatioQ2Filters) (bool, utils.Diff) {
+	if !reflect.DeepEqual(in.SearchQuery, actualRatioQ2Filters.SearchQuery) {
+		return false, utils.Diff{
+			Name:    "SearchQuery",
+			Desired: utils.PointerToString(in.SearchQuery),
+			Actual:  utils.PointerToString(actualRatioQ2Filters.SearchQuery),
+		}
+	}
+
+	if !reflect.DeepEqual(in.Alias, actualRatioQ2Filters.Alias) {
 		return false, utils.Diff{
 			Name:    "Alias",
-			Desired: alias,
-			Actual:  actualAlias,
+			Desired: utils.PointerToString(in.Alias),
+			Actual:  utils.PointerToString(actualRatioQ2Filters.Alias),
 		}
 	}
 
-	if searchQuery, actualSearchQuery := in.SearchQuery, filters.GetText(); searchQuery == nil && actualSearchQuery != nil {
-		return false, utils.Diff{
-			Name:    "SearchQuery",
-			Desired: searchQuery,
-			Actual:  *actualSearchQuery,
-		}
-	} else if searchQuery, actualSearchQuery := *searchQuery, actualSearchQuery.GetValue(); searchQuery != actualSearchQuery {
-		return false, utils.Diff{
-			Name:    "SearchQuery",
-			Desired: searchQuery,
-			Actual:  actualSearchQuery,
-		}
-	}
-
-	if severities, actualSeverities := in.Severities, filters.Severities; !equalSeverities(severities, actualSeverities) {
+	if !utils.SlicesWithUniqueValuesEqual(in.Severities, actualRatioQ2Filters.Severities) {
 		return false, utils.Diff{
 			Name:    "Severities",
-			Desired: severities,
-			Actual:  actualSeverities,
+			Desired: in.Severities,
+			Actual:  actualRatioQ2Filters.Severities,
 		}
 	}
 
-	if applications, actualApplications := in.Applications, utils.WrappedStringSliceToStringSlice(filters.Applications); !utils.SlicesWithUniqueValuesEqual(applications, actualApplications) {
+	if !utils.SlicesWithUniqueValuesEqual(in.Applications, actualRatioQ2Filters.Applications) {
 		return false, utils.Diff{
 			Name:    "Application",
-			Desired: applications,
-			Actual:  actualApplications,
+			Desired: in.Applications,
+			Actual:  actualRatioQ2Filters.Applications,
 		}
 	}
 
-	if subsystems, actualSubsystems := in.Subsystems, utils.WrappedStringSliceToStringSlice(filters.Subsystems); !utils.SlicesWithUniqueValuesEqual(subsystems, actualSubsystems) {
+	if !utils.SlicesWithUniqueValuesEqual(in.Subsystems, actualRatioQ2Filters.Subsystems) {
 		return false, utils.Diff{
 			Name:    "Subsystems",
-			Desired: subsystems,
-			Actual:  actualSubsystems,
+			Desired: in.Subsystems,
+			Actual:  actualRatioQ2Filters.Subsystems,
 		}
 	}
 
@@ -2852,8 +2572,17 @@ func (in *RatioQ2Filters) DeepEqual(filters *alerts.AlertFilters_RatioAlert) (bo
 // +kubebuilder:validation:Enum=Debug;Verbose;Info;Warning;Critical;Error;
 type FiltersLogSeverity string
 
+const (
+	FiltersLogSeverityDebug    FiltersLogSeverity = "Debug"
+	FiltersLogSeverityVerbose  FiltersLogSeverity = "Verbose"
+	FiltersLogSeverityInfo     FiltersLogSeverity = "Info"
+	FiltersLogSeverityWarning  FiltersLogSeverity = "Warning"
+	FiltersLogSeverityCritical FiltersLogSeverity = "Critical"
+	FiltersLogSeverityError    FiltersLogSeverity = "Error"
+)
+
 type TracingFilters struct {
-	LatencyThresholdMilliseconds int `json:"latencyThresholdMilliseconds,omitempty"`
+	LatencyThresholdMilliseconds resource.Quantity `json:"latencyThresholdMilliseconds,omitempty"`
 
 	// +optional
 	TagFilters []TagFilter `json:"tagFilters,omitempty"`
@@ -2868,44 +2597,44 @@ type TracingFilters struct {
 	Services []string `json:"services,omitempty"`
 }
 
-func (in *TracingFilters) DeepEqual(filters *alerts.TracingAlert) (bool, utils.Diff) {
-	if latencyThresholdMS, actualLatencyThresholdMS := int64(in.LatencyThresholdMilliseconds)*time.Millisecond.Microseconds(), int64(filters.ConditionLatency); latencyThresholdMS != actualLatencyThresholdMS {
+func (in *TracingFilters) DeepEqual(actualFilters TracingFilters) (bool, utils.Diff) {
+	if !in.LatencyThresholdMilliseconds.Equal(actualFilters.LatencyThresholdMilliseconds) {
 		return false, utils.Diff{
 			Name:    "LatencyThresholdMilliseconds",
-			Desired: latencyThresholdMS,
-			Actual:  actualLatencyThresholdMS,
+			Desired: in.LatencyThresholdMilliseconds,
+			Actual:  actualFilters.LatencyThresholdMilliseconds,
 		}
 	}
 
-	if actualTagFilters := flattenTagFilters(filters.GetTagFilters()); !deepEqualTagFilters(in.TagFilters, actualTagFilters) {
+	if !deepEqualTagFilters(in.TagFilters, actualFilters.TagFilters) {
 		return false, utils.Diff{
 			Name:    "TagFilters",
 			Desired: in.TagFilters,
-			Actual:  actualTagFilters,
+			Actual:  actualFilters.TagFilters,
 		}
 	}
 
-	actualApplications, actualSubsystems, actualServices := flattenTracingFilters(filters.GetFieldFilters())
-	if !utils.SlicesWithUniqueValuesEqual(in.Applications, actualApplications) {
+	if !utils.SlicesWithUniqueValuesEqual(in.Applications, actualFilters.Applications) {
 		return false, utils.Diff{
 			Name:    "Applications",
 			Desired: in.Applications,
-			Actual:  actualApplications,
-		}
-	}
-	if !utils.SlicesWithUniqueValuesEqual(in.Subsystems, actualSubsystems) {
-		return false, utils.Diff{
-			Name:    "Subsystems",
-			Desired: in.Subsystems,
-			Actual:  actualSubsystems,
+			Actual:  actualFilters.Applications,
 		}
 	}
 
-	if !utils.SlicesWithUniqueValuesEqual(in.Services, actualServices) {
+	if !utils.SlicesWithUniqueValuesEqual(in.Subsystems, actualFilters.Subsystems) {
+		return false, utils.Diff{
+			Name:    "Subsystems",
+			Desired: in.Subsystems,
+			Actual:  actualFilters.Subsystems,
+		}
+	}
+
+	if !utils.SlicesWithUniqueValuesEqual(in.Services, actualFilters.Services) {
 		return false, utils.Diff{
 			Name:    "Services",
 			Desired: in.Services,
-			Actual:  actualServices,
+			Actual:  actualFilters.Services,
 		}
 	}
 
@@ -2996,19 +2725,43 @@ type ManageUndetectedValues struct {
 	AutoRetireRatio *AutoRetireRatio `json:"autoRetireRatio,omitempty"`
 }
 
-func (in *ManageUndetectedValues) DeepEqual(manageUndetectedValues *alerts.RelatedExtendedData) (bool, utils.Diff) {
-	if enableTriggeringOnUndetectedValues, actualEnableTriggeringOnUndetectedValues := in.EnableTriggeringOnUndetectedValues, manageUndetectedValues.GetShouldTriggerDeadman().GetValue(); enableTriggeringOnUndetectedValues != actualEnableTriggeringOnUndetectedValues {
+func (in *ManageUndetectedValues) DeepEqual(actualManageUndetectedValues *ManageUndetectedValues) (bool, utils.Diff) {
+	if in == nil {
+		if actualManageUndetectedValues == nil {
+			return true, utils.Diff{}
+		}
+
+		if actualManageUndetectedValues.EnableTriggeringOnUndetectedValues == true && *actualManageUndetectedValues.AutoRetireRatio == AutoRetireRatioNever {
+			return true, utils.Diff{}
+		} else {
+			return false, utils.Diff{
+				Name:    "ManageUndetectedValues",
+				Desired: utils.PointerToString(in),
+				Actual:  utils.PointerToString(actualManageUndetectedValues),
+			}
+		}
+
+	} else if actualManageUndetectedValues == nil {
 		return false, utils.Diff{
-			Name:    "EnableTriggeringOnUndetectedValues",
-			Desired: enableTriggeringOnUndetectedValues,
-			Actual:  actualEnableTriggeringOnUndetectedValues,
+			Name:    "ManageUndetectedValues",
+			Desired: utils.PointerToString(in),
+			Actual:  utils.PointerToString(actualManageUndetectedValues),
 		}
 	}
-	if autoRetireRatio, actualAutoRetireRatio := alertSchemaAutoRetireRatioToProtoAutoRetireRatio[*in.AutoRetireRatio], manageUndetectedValues.GetCleanupDeadmanDuration(); autoRetireRatio != actualAutoRetireRatio {
+
+	if in.EnableTriggeringOnUndetectedValues != actualManageUndetectedValues.EnableTriggeringOnUndetectedValues {
 		return false, utils.Diff{
-			Name:    "AutoRetireRatio",
-			Desired: autoRetireRatio,
-			Actual:  actualAutoRetireRatio,
+			Name:    "ManageUndetectedValues.EnableTriggeringOnUndetectedValues",
+			Desired: in.EnableTriggeringOnUndetectedValues,
+			Actual:  actualManageUndetectedValues.EnableTriggeringOnUndetectedValues,
+		}
+	}
+
+	if !reflect.DeepEqual(in.AutoRetireRatio, actualManageUndetectedValues.AutoRetireRatio) {
+		return false, utils.Diff{
+			Name:    "ManageUndetectedValues.AutoRetireRatio",
+			Desired: utils.PointerToString(in.AutoRetireRatio),
+			Actual:  utils.PointerToString(actualManageUndetectedValues.AutoRetireRatio),
 		}
 	}
 
@@ -3022,8 +2775,8 @@ type FlowStage struct {
 	Groups []FlowStageGroup `json:"groups,omitempty"`
 }
 
-func (in *FlowStage) DeepEqual(stage *alerts.FlowStage) (bool, utils.Diff) {
-	if groups, actualGroups := in.Groups, stage.Groups; len(groups) != len(actualGroups) {
+func (in *FlowStage) DeepEqual(actualStage FlowStage) (bool, utils.Diff) {
+	if groups, actualGroups := in.Groups, actualStage.Groups; len(groups) != len(actualGroups) {
 		return false, utils.Diff{
 			Name:    "Groups",
 			Desired: groups,
@@ -3041,25 +2794,11 @@ func (in *FlowStage) DeepEqual(stage *alerts.FlowStage) (bool, utils.Diff) {
 		}
 	}
 
-	if timeFrame, actualTimeFrame := in.TimeWindow, stage.GetTimeframe(); timeFrame == nil && actualTimeFrame != nil {
+	if !reflect.DeepEqual(in.TimeWindow, actualStage.TimeWindow) {
 		return false, utils.Diff{
-			Name:    "TimeFrame",
-			Desired: timeFrame,
-			Actual:  *actualTimeFrame,
-		}
-	} else if timeFrame != nil && actualTimeFrame == nil {
-		return false, utils.Diff{
-			Name:    "TimeFrame",
-			Desired: *timeFrame,
-			Actual:  actualTimeFrame,
-		}
-	} else if timeFrame != nil && actualTimeFrame != nil {
-		if timeMS, actualTimeMS := expandTimeToMS(*timeFrame), int(actualTimeFrame.GetMs().GetValue()); timeMS != actualTimeMS {
-			return false, utils.Diff{
-				Name:    "TimeFrameMS",
-				Desired: timeMS,
-				Actual:  actualTimeMS,
-			}
+			Name:    "TimeWindow",
+			Desired: utils.PointerToString(in.TimeWindow),
+			Actual:  utils.PointerToString(actualStage.TimeWindow),
 		}
 	}
 
@@ -3083,8 +2822,28 @@ type FlowStageGroup struct {
 	NextOperator FlowOperator `json:"nextOperator,omitempty"`
 }
 
-func (in *FlowStageGroup) DeepEqual(group *alerts.FlowGroup) (bool, utils.Diff) {
-	if alerts, actualAlerts := in.InnerFlowAlerts.Alerts, group.Alerts.Values; len(alerts) != len(actualAlerts) {
+func (in *FlowStageGroup) DeepEqual(actualGroup FlowStageGroup) (bool, utils.Diff) {
+	if equal, diff := in.InnerFlowAlerts.DeepEqual(actualGroup.InnerFlowAlerts); !equal {
+		return false, utils.Diff{
+			Name:    fmt.Sprintf("InnerFlowAlerts.%s", diff.Name),
+			Desired: diff.Desired,
+			Actual:  diff.Actual,
+		}
+	}
+
+	if in.NextOperator != actualGroup.NextOperator {
+		return false, utils.Diff{
+			Name:    "NextOperator",
+			Desired: in.NextOperator,
+			Actual:  actualGroup.NextOperator,
+		}
+	}
+
+	return true, utils.Diff{}
+}
+
+func (in *InnerFlowAlerts) DeepEqual(actualInnerFlowAlerts InnerFlowAlerts) (bool, utils.Diff) {
+	if alerts, actualAlerts := in.Alerts, actualInnerFlowAlerts.Alerts; len(alerts) != len(actualAlerts) {
 		return false, utils.Diff{
 			Name:    "Alerts",
 			Desired: alerts,
@@ -3101,15 +2860,6 @@ func (in *FlowStageGroup) DeepEqual(group *alerts.FlowGroup) (bool, utils.Diff) 
 			}
 		}
 	}
-
-	if operator, actualOperator := alertSchemaFlowOperatorToProtoFlowOperator[in.NextOperator], group.NextOp; operator != actualOperator {
-		return false, utils.Diff{
-			Name:    "Operator",
-			Desired: operator,
-			Actual:  actualOperator,
-		}
-	}
-
 	return true, utils.Diff{}
 }
 
@@ -3127,19 +2877,20 @@ type InnerFlowAlert struct {
 	UserAlertId string `json:"userAlertId,omitempty"`
 }
 
-func (in *InnerFlowAlert) DeepEqual(alert *alerts.FlowAlert) (bool, utils.Diff) {
-	if not, actualNot := in.Not, alert.GetNot().GetValue(); not != actualNot {
+func (in *InnerFlowAlert) DeepEqual(actualInnerFlowAlert InnerFlowAlert) (bool, utils.Diff) {
+	if in.Not != actualInnerFlowAlert.Not {
 		return false, utils.Diff{
 			Name:    "Not",
-			Desired: not,
-			Actual:  actualNot,
+			Desired: in.Not,
+			Actual:  actualInnerFlowAlert.Not,
 		}
 	}
-	if id, actualID := in.UserAlertId, alert.GetId().GetValue(); id != actualID {
+
+	if in.UserAlertId != actualInnerFlowAlert.UserAlertId {
 		return false, utils.Diff{
-			Name:    "ID",
-			Desired: id,
-			Actual:  actualID,
+			Name:    "UserAlertId",
+			Desired: in.UserAlertId,
+			Actual:  actualInnerFlowAlert.UserAlertId,
 		}
 	}
 
@@ -3154,6 +2905,26 @@ type AlertStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 	ID *string `json:"id"`
+
+	Name string `json:"name,omitempty"`
+
+	Description string `json:"description,omitempty"`
+
+	Active bool `json:"active,omitempty"`
+
+	Severity AlertSeverity `json:"severity,omitempty"`
+
+	Labels map[string]string `json:"labels,omitempty"`
+
+	ExpirationDate *ExpirationDate `json:"expirationDate,omitempty"`
+
+	Notifications *Notifications `json:"notifications,omitempty"`
+
+	PayloadFilters []string `json:"payloadFilters,omitempty"`
+
+	Scheduling *Scheduling `json:"scheduling,omitempty"`
+
+	AlertType AlertType `json:"alertType,omitempty"`
 }
 
 //+kubebuilder:object:root=true

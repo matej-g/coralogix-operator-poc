@@ -29,9 +29,9 @@ spec:
               - innerFlowAlerts:
                   alerts:
                     - not: true
-                      userAlertId: 5f78b732-7659-4ef9-9d7f-2985fe363df5
+                      userAlertId: cb998390-f28b-40e9-b8ed-97eaa6aa240b
                     - not: false
-                      userAlertId: 6b22a98b-c5db-44a1-92d9-6c6e51602ba2
+                      userAlertId: cb998390-f28b-40e9-b8ed-97eaa6aa240b
                   operator: And
                 nextOperator: And
             timeWindow:
@@ -40,7 +40,7 @@ spec:
               - innerFlowAlerts:
                   alerts:
                     - not: true
-                      userAlertId: 23ce1855-6825-4476-bca0-bfcc037687f8
+                      userAlertId: cb998390-f28b-40e9-b8ed-97eaa6aa240b
                   operator: And
                 nextOperator: Or
             timeWindow:
