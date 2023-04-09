@@ -1,0 +1,64 @@
+apiVersion: coralogix.coralogix/v1
+kind: Alert
+metadata:
+  labels:
+    app.kubernetes.io/name: alert
+    app.kubernetes.io/instance: alert-sample
+    app.kubernetes.io/part-of: coralogix-operator-poc
+    app.kuberentes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: coralogix-operator-poc
+  name: tracing-alert-example
+  status:
+    active: true
+    alertType:
+      tracing:
+        conditions:
+          alertWhen: More
+          threshold: 5
+          timeWindow: TenMinutes
+        filters:
+          applications:
+            - application_name
+            - filter:contains:application-name2
+            - filter:endsWith:application-name3
+            - filter:startsWith:application-name4
+          latencyThresholdMilliseconds: "20"
+          services:
+            - filter:endsWith:serviceName
+            - filter:startsWith:serviceName
+            - serviceName
+            - filter:contains:serviceName
+          subsystems:
+            - filter:startsWith:subsystemName
+            - subsystemName
+            - filter:contains:subsystemName
+            - filter:endsWith:subsystemName
+          tagFilters:
+            - field: name
+              values:
+                - filter:endsWith:name1
+                - filter:startsWith:name2
+            - field: status
+              values:
+                - filter:contains:400
+                - "500"
+    description: alert from k8s operator
+    name: tracing alert example
+    notifications:
+      notifyEveryMin: 10
+      notifyOnlyOnTriggeredGroupByValues: false
+      onTriggerAndResolved: false
+      recipients:
+        emails:
+          - user@example.com
+        webhooks:
+          - WebhookAlerts
+    scheduling:
+      daysEnabled:
+        - Wednesday
+        - Thursday
+      endTime: "20:30"
+      startTime: "08:30"
+      timeZone: UTC+02
+    severity: Critical
+
