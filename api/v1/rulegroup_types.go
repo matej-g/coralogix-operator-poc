@@ -986,6 +986,15 @@ func expandSourceFiledAndParameters(rule Rule) (sourceField *wrapperspb.StringVa
 				},
 			},
 		}
+	} else if extract := rule.Extract; extract != nil {
+		sourceField = wrapperspb.String(extract.SourceField)
+		parameters = &rulesgroups.RuleParameters{
+			RuleParameters: &rulesgroups.RuleParameters_ExtractParameters{
+				ExtractParameters: &rulesgroups.ExtractParameters{
+					Rule: wrapperspb.String(extract.Regex),
+				},
+			},
+		}
 	}
 
 	return

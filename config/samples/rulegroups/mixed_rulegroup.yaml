@@ -7,9 +7,9 @@ metadata:
     app.kubernetes.io/part-of: coralogix-operator-poc
     app.kuberentes.io/managed-by: kustomize
     app.kubernetes.io/created-by: coralogix-operator-poc
-  name: rulegroup-sample
+  name: mixed-rulegroupmixed-rulegroup
 spec:
-  name: rule-group
+  name: mixed-rulegroup
   description: rule-group from k8s operator
   applications: [ "application-name" ]
   subsystems: [ "subsystems-name" ]
