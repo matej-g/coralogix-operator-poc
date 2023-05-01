@@ -34,6 +34,32 @@ rules:
 - apiGroups:
   - coralogix.coralogix
   resources:
+  - recordingrulegroups
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - coralogix.coralogix
+  resources:
+  - recordingrulegroups/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - coralogix.coralogix
+  resources:
+  - recordingrulegroups/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - coralogix.coralogix
+  resources:
   - rulegroups
   verbs:
   - create
