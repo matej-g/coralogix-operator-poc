@@ -35,8 +35,10 @@ type RecordingRuleGroupSpec struct {
 
 	Name string `json:"name,omitempty"`
 
+	// +optional
 	IntervalSeconds int32 `json:"intervalSeconds,omitempty"`
 
+	// +optional
 	Limit int64 `json:"limit,omitempty"`
 
 	Rules []RecordingRule `json:"rules,omitempty"`
