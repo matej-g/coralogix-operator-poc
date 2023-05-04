@@ -23,6 +23,7 @@ import (
 
 	utils "coralogix-operator-poc/api"
 	"coralogix-operator-poc/controllers/clientset"
+	prometheus "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -54,6 +55,8 @@ var (
 )
 
 func init() {
+	utilruntime.Must(prometheus.AddToScheme(scheme))
+
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
 	utilruntime.Must(coralogixv1.AddToScheme(scheme))
@@ -120,6 +123,14 @@ func main() {
 		Scheme:             mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Alert")
+		os.Exit(1)
+	}
+	if err = (&controllers.RecordingRuleGroupReconciler{
+		CoralogixClientSet: clientset.NewClientSet(targetUrl, apiKey),
+		Client:             mgr.GetClient(),
+		Scheme:             mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "RecordingRuleGroup")
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder

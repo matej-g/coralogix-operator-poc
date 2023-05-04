@@ -1,6 +1,7 @@
 domain: coralogix
 layout:
 - go.kubebuilder.io/v3
+multigroup: true
 projectName: coralogix-operator-poc
 repo: coralogix-operator-poc
 resources:
@@ -20,6 +21,15 @@ resources:
   domain: coralogix
   group: coralogix
   kind: Alert
+  path: coralogix-operator-poc/api/v1
+  version: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: coralogix
+  group: coralogix
+  kind: RecordingRuleGroup
   path: coralogix-operator-poc/api/v1
   version: v1
 version: "3"
