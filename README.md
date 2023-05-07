@@ -1,4 +1,6 @@
 # coralogix-operator-poc
+![Go Report Card](https://goreportcard.com/badge/github.com/coralogix/coralogix-operator-poc)
+![acc-tests](https://github.com/coralogix/coralogix-operator-poc/actions/workflows/acc-test.yml/badge.svg?style=plastic)
 // TODO(user): Add simple overview of use/purpose
 
 ## Description
