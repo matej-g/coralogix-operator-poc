@@ -73,8 +73,6 @@ type AlertReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.13.0/pkg/reconcile
 func (r *AlertReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
-
 	log := log.FromContext(ctx)
 	jsm := &jsonpb.Marshaler{
 		//Indent: "\t",
@@ -83,7 +81,6 @@ func (r *AlertReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 
 	//Get alertCRD
 	alertCRD := &coralogixv1.Alert{}
-
 	if err := r.Client.Get(ctx, req.NamespacedName, alertCRD); err != nil {
 		if errors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.

@@ -18,29 +18,19 @@ package controllers
 
 import (
 	"context"
-	"strconv"
-	"time"
 
 	coralogixv1 "coralogix-operator-poc/api/v1"
 	"coralogix-operator-poc/controllers/clientset"
 	rrg "coralogix-operator-poc/controllers/clientset/grpc/recording-rules-groups/v1"
 	"github.com/golang/protobuf/jsonpb"
-	prometheus "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
 // RecordingRuleGroupReconciler reconciles a RecordingRuleGroup object
@@ -53,7 +43,6 @@ type RecordingRuleGroupReconciler struct {
 //+kubebuilder:rbac:groups=coralogix.coralogix,resources=recordingrulegroups,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=coralogix.coralogix,resources=recordingrulegroups/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=coralogix.coralogix,resources=recordingrulegroups/finalizers,verbs=update
-//+kubebuilder:rbac:groups=monitoring.coreos.com,resources=prometheusrules,verbs=get;list;watch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -71,36 +60,9 @@ func (r *RecordingRuleGroupReconciler) Reconcile(ctx context.Context, req ctrl.R
 	}
 	rRGClient := r.CoralogixClientSet.RecordingRuleGroups()
 
-	prometheusRuleCRD := &prometheus.PrometheusRule{}
+	//Get ruleGroupSetRD
 	ruleGroupSetCRD := &coralogixv1.RecordingRuleGroup{}
-	if err := r.Get(ctx, req.NamespacedName, prometheusRuleCRD); err != nil && !errors.IsNotFound(err) { //Checking if there's a PrometheusRule to track with that NamespacedName.
-		return ctrl.Result{RequeueAfter: defaultErrRequeuePeriod}, err
-	} else if err == nil && toTrackPrometheusRule(prometheusRuleCRD) { //Meaning there's a PrometheusRule to track with that NamespacedName.
-		log.V(1).Info("Fetched PrometheusRule. Trying to create/update a RecordingRuleGroupSet accordingly.", "PrometheusRule name", prometheusRuleCRD.Name)
-		//Converting the PrometheusRule to the desired RecordingRuleGroupSet.
-		if ruleGroupSetCRD, err = prometheusRuleToRuleGroupSet(prometheusRuleCRD); err != nil {
-			log.Error(err, "Received an error while Converting PrometheusRule to RecordingRuleGroupSet", "PrometheusRule Name", prometheusRuleCRD.Name)
-			return ctrl.Result{RequeueAfter: defaultErrRequeuePeriod}, err
-		}
-
-		ruleGroupSetExist := &coralogixv1.RecordingRuleGroup{}
-		if err = r.Client.Get(ctx, req.NamespacedName, ruleGroupSetExist); err != nil {
-			if errors.IsNotFound(err) {
-				//Meaning there's a PrometheusRule with that NamespacedName but not RecordingRuleGroupSet accordingly (so creating it).
-				if err = r.Create(ctx, ruleGroupSetCRD); err != nil {
-					log.Error(err, "Received an error while trying to create RecordingRuleGroupSet CRD", "RecordingRuleGroupSet Name", ruleGroupSetCRD.Name)
-					return ctrl.Result{RequeueAfter: defaultErrRequeuePeriod}, err
-				}
-				if err = r.Client.Get(ctx, req.NamespacedName, ruleGroupSetExist); err != nil {
-					log.Error(err, "Received an error while trying to fetch RecordingRuleGroupSet CRD", "RecordingRuleGroupSet Name", ruleGroupSetCRD.Name)
-					return ctrl.Result{RequeueAfter: defaultErrRequeuePeriod}, err
-				}
-			} else {
-				return ctrl.Result{RequeueAfter: defaultErrRequeuePeriod}, err
-			}
-		}
-		ruleGroupSetCRD.ResourceVersion = ruleGroupSetExist.ResourceVersion
-	} else if err = r.Client.Get(ctx, req.NamespacedName, ruleGroupSetCRD); err != nil { //Meaning there isn't PrometheusRule with that NamespacedName (so trying to fetch RecordingRuleGroupSet with that NamespacedName).
+	if err := r.Client.Get(ctx, req.NamespacedName, ruleGroupSetCRD); err != nil {
 		if errors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
 			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
@@ -108,7 +70,6 @@ func (r *RecordingRuleGroupReconciler) Reconcile(ctx context.Context, req ctrl.R
 			return ctrl.Result{}, nil
 		}
 		// Error reading the object - requeue the request
-		log.Error(err, "Received an error while trying to create RecordingRuleGroupSet CRD", "RecordingRuleGroupSet Name", ruleGroupSetCRD.Name)
 		return ctrl.Result{RequeueAfter: defaultErrRequeuePeriod}, err
 	}
 
@@ -214,6 +175,8 @@ func (r *RecordingRuleGroupReconciler) Reconcile(ctx context.Context, req ctrl.R
 				log.Error(err, "Received an error while updating a RecordingRuleGroupSet", "recordingRuleGroup", updateRRGReq)
 				return ctrl.Result{RequeueAfter: defaultErrRequeuePeriod}, err
 			}
+
+			r.Client.Get(ctx, req.NamespacedName, ruleGroupSetCRD)
 			ruleGroupSetCRD.Status = *flattenRecordingRuleGroup(getRuleGroupResp.GetRuleGroup())
 			if err := r.Status().Update(ctx, ruleGroupSetCRD); err != nil {
 				log.V(1).Error(err, "Error on updating RuleGroupSet crd")
@@ -223,77 +186,6 @@ func (r *RecordingRuleGroupReconciler) Reconcile(ctx context.Context, req ctrl.R
 	}
 
 	return ctrl.Result{RequeueAfter: defaultRequeuePeriod}, nil
-}
-
-func toTrackPrometheusRule(rule *prometheus.PrometheusRule) bool {
-	if toCreateStr, ok := rule.Labels["cxCreateRecordingRule"]; ok && toCreateStr == "true" {
-		return true
-	}
-	return false
-}
-
-func prometheusRuleToRuleGroupSet(prometheusRule *prometheus.PrometheusRule) (*coralogixv1.RecordingRuleGroup, error) {
-	if len(prometheusRule.Spec.Groups) > 0 {
-		h, _ := time.ParseDuration(string(prometheusRule.Spec.Groups[0].Interval))
-		intervalSeconds := int32(h.Seconds())
-
-		limit := int64(60)
-		if limitStr, ok := prometheusRule.Annotations["cx_limit"]; ok && limitStr != "" {
-			if limitInt, err := strconv.Atoi(limitStr); err != nil {
-				return nil, err
-			} else {
-				limit = int64(limitInt)
-			}
-		}
-
-		rules := coralogixInnerRulesToPrometheusInnerRules(prometheusRule.Spec.Groups[0].Rules)
-		return &coralogixv1.RecordingRuleGroup{
-			ObjectMeta: metav1.ObjectMeta{Namespace: prometheusRule.Namespace, Name: prometheusRule.Name},
-			Spec: coralogixv1.RecordingRuleGroupSpec{
-				Name:            prometheusRule.Name,
-				IntervalSeconds: intervalSeconds,
-				Limit:           limit,
-				Rules:           rules,
-			},
-		}, nil
-	}
-
-	return &coralogixv1.RecordingRuleGroup{
-		ObjectMeta: metav1.ObjectMeta{Namespace: prometheusRule.Namespace, Name: prometheusRule.Name},
-		Spec: coralogixv1.RecordingRuleGroupSpec{
-			Name: prometheusRule.Name,
-		},
-	}, nil
-}
-
-func coralogixInnerRulesToPrometheusInnerRules(rules []prometheus.Rule) []coralogixv1.RecordingRule {
-	result := make([]coralogixv1.RecordingRule, 0, len(rules))
-	for _, r := range rules {
-		rule := coralogixInnerRuleToPrometheusInnerRule(r)
-		result = append(result, rule)
-	}
-	return result
-}
-
-func coralogixInnerRuleToPrometheusInnerRule(rule prometheus.Rule) coralogixv1.RecordingRule {
-	return coralogixv1.RecordingRule{
-		Record: rule.Record,
-		Expr:   rule.Expr.StrVal,
-		Labels: rule.Labels,
-	}
-}
-
-func (r *RecordingRuleGroupReconciler) findPrometheusRules(v client.Object) []reconcile.Request {
-	prometheusRule := v.(*prometheus.PrometheusRule)
-
-	request := reconcile.Request{
-		NamespacedName: types.NamespacedName{
-			Namespace: prometheusRule.Namespace,
-			Name:      prometheusRule.Name,
-		},
-	}
-
-	return []reconcile.Request{request}
 }
 
 func flattenRecordingRuleGroup(rRG *rrg.RecordingRuleGroup) *coralogixv1.RecordingRuleGroupStatus {
@@ -332,8 +224,5 @@ func flattenRecordingRule(rule *rrg.RecordingRule) coralogixv1.RecordingRule {
 func (r *RecordingRuleGroupReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&coralogixv1.RecordingRuleGroup{}).
-		Watches(&source.Kind{Type: &prometheus.PrometheusRule{}},
-			handler.EnqueueRequestsFromMapFunc(r.findPrometheusRules),
-			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{})).
 		Complete(r)
 }

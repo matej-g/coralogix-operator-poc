@@ -5,7 +5,7 @@ metadata:
   labels:
     prometheus: example
     role: alert-rules
-    cxCreateRecordingRule: "true"
+    cxCreateAndTrackRecordingRule: "true"
   name: prometheus-example-rules
 spec:
   groups:
@@ -15,4 +15,4 @@ spec:
         - record: ExampleRecord
           expr: vector(1)
         - record: ExampleRecord2
-          expr: vector(2)
+          expr: vector(3)
