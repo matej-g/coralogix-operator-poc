@@ -73,9 +73,9 @@ func (r *RecordingRuleGroupReconciler) Reconcile(ctx context.Context, req ctrl.R
 
 	prometheusRuleCRD := &prometheus.PrometheusRule{}
 	ruleGroupSetCRD := &coralogixv1.RecordingRuleGroup{}
-	if err := r.Get(ctx, req.NamespacedName, prometheusRuleCRD); err != nil && !errors.IsNotFound(err) { //Checking if there's a PrometheusRule with that NamespacedName.
+	if err := r.Get(ctx, req.NamespacedName, prometheusRuleCRD); err != nil && !errors.IsNotFound(err) { //Checking if there's a PrometheusRule to track with that NamespacedName.
 		return ctrl.Result{RequeueAfter: defaultErrRequeuePeriod}, err
-	} else if err == nil { //Meaning there's a PrometheusRule with that NamespacedName.
+	} else if err == nil && toTrackPrometheusRule(prometheusRuleCRD) { //Meaning there's a PrometheusRule to track with that NamespacedName.
 		log.V(1).Info("Fetched PrometheusRule. Trying to create/update a RecordingRuleGroupSet accordingly.", "PrometheusRule name", prometheusRuleCRD.Name)
 		//Converting the PrometheusRule to the desired RecordingRuleGroupSet.
 		if ruleGroupSetCRD, err = prometheusRuleToRuleGroupSet(prometheusRuleCRD); err != nil {
@@ -223,6 +223,13 @@ func (r *RecordingRuleGroupReconciler) Reconcile(ctx context.Context, req ctrl.R
 	}
 
 	return ctrl.Result{RequeueAfter: defaultRequeuePeriod}, nil
+}
+
+func toTrackPrometheusRule(rule *prometheus.PrometheusRule) bool {
+	if toCreateStr, ok := rule.Labels["cxCreateRecordingRule"]; ok && toCreateStr == "true" {
+		return true
+	}
+	return false
 }
 
 func prometheusRuleToRuleGroupSet(prometheusRule *prometheus.PrometheusRule) (*coralogixv1.RecordingRuleGroup, error) {
