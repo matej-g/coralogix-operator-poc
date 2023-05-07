@@ -25,9 +25,9 @@ jobs:
         uses: actions/setup-go@37335c7bb261b353407cff977110895fa0b4f7d8
         with:
           go-version: ${{ matrix.go-version }}
-      - name: Acceptance Tests
+      - name: E2E Tests
         env:
-          CORALOGIX_ENV: ${{ secrets.CORALOGIX_ENV }}
+          CORALOGIX_REGION: ${{ secrets.CORALOGIX_REGION }}
           CORALOGIX_API_KEY: ${{ secrets.CORALOGIX_API_KEY }}
         run: |
           make e2e
