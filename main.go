@@ -21,9 +21,10 @@ import (
 	"fmt"
 	"os"
 
+	prometheus "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+
 	utils "coralogix-operator-poc/api"
 	"coralogix-operator-poc/controllers/clientset"
-	prometheus "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -50,6 +51,7 @@ var (
 		"EUROPE1": "ng-api-grpc.coralogix.com:443",
 		"EUROPE2": "ng-api-grpc.eu2.coralogix.com:443",
 		"USA1":    "ng-api-grpc.coralogix.us:443",
+		"STG":     "ng-api-grpc.app.staging.coralogix.net:443",
 	}
 	validRegions = utils.GetKeys(regionToGrpcUrl)
 )
@@ -125,12 +127,12 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "Alert")
 		os.Exit(1)
 	}
-	if err = (&controllers.RecordingRuleGroupReconciler{
+	if err = (&controllers.RecordingRuleGroupSetReconciler{
 		CoralogixClientSet: clientset.NewClientSet(targetUrl, apiKey),
 		Client:             mgr.GetClient(),
 		Scheme:             mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "RecordingRuleGroup")
+		setupLog.Error(err, "unable to create controller", "controller", "RecordingRuleGroupSet")
 		os.Exit(1)
 	}
 	if err = (&controllers.PrometheusRuleReconciler{

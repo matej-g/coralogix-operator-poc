@@ -25,9 +25,9 @@ import (
 
 //+kubebuilder:rbac:groups=monitoring.coreos.com,resources=prometheusrules,verbs=get;list;watch
 
-//+kubebuilder:rbac:groups=coralogix.coralogix,resources=recordingrulegroups,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=coralogix.coralogix,resources=recordingrulegroups/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=coralogix.coralogix,resources=recordingrulegroups/finalizers,verbs=update
+//+kubebuilder:rbac:groups=coralogix.coralogix,resources=recordingrulegroupsets,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=coralogix.coralogix,resources=recordingrulegroupsets/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=coralogix.coralogix,resources=recordingrulegroupsets/finalizers,verbs=update
 
 //+kubebuilder:rbac:groups=coralogix.coralogix,resources=alerts,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=coralogix.coralogix,resources=alerts/status,verbs=get;update;patch
@@ -56,7 +56,7 @@ func (r *PrometheusRuleReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}
 
 	if createAndTrackRecordingRules(prometheusRuleCRD) {
-		ruleGroupSetCRD := &coralogixv1.RecordingRuleGroup{}
+		ruleGroupSetCRD := &coralogixv1.RecordingRuleGroupSet{}
 		if err := r.Client.Get(ctx, req.NamespacedName, ruleGroupSetCRD); err != nil {
 			if errors.IsNotFound(err) {
 				log.V(1).Info(fmt.Sprintf("Couldn't find RecordingRuleSet Namespace: %s, Name: %s. Trying to create.", req.Namespace, req.Name))
@@ -136,31 +136,27 @@ func createAndTrackAlerts(prometheusRule *prometheus.PrometheusRule) bool {
 	return false
 }
 
-func prometheusRuleToRuleGroupSet(prometheusRule *prometheus.PrometheusRule) (coralogixv1.RecordingRuleGroupSpec, error) {
-	if len(prometheusRule.Spec.Groups) > 0 {
-		s, _ := time.ParseDuration(string(prometheusRule.Spec.Groups[0].Interval))
-		intervalSeconds := int32(s.Seconds())
+func prometheusRuleToRuleGroupSet(prometheusRule *prometheus.PrometheusRule) (coralogixv1.RecordingRuleGroupSetSpec, error) {
+	groups := make([]coralogixv1.RecordingRuleGroup, 0)
+	for _, group := range prometheusRule.Spec.Groups {
+		duration, _ := time.ParseDuration(string(group.Interval))
+		intervalSeconds := int32(duration.Seconds())
 
-		limit := int64(60)
-		if limitStr, ok := prometheusRule.Annotations["cx_limit"]; ok && limitStr != "" {
-			if limitInt, err := strconv.Atoi(limitStr); err != nil {
-				return coralogixv1.RecordingRuleGroupSpec{}, err
-			} else {
-				limit = int64(limitInt)
-			}
+		rules := prometheusInnerRulesToCoralogixInnerRules(group.Rules)
+
+		ruleGroup := coralogixv1.RecordingRuleGroup{
+			Name:            group.Name,
+			IntervalSeconds: intervalSeconds,
+			Limit:           60,
+			Rules:           rules,
 		}
 
-		rules := prometheusInnerRulesToCoralogixInnerRules(prometheusRule.Spec.Groups[0].Rules)
-
-		return coralogixv1.RecordingRuleGroupSpec{
-			Name:            prometheusRule.Name,
-			IntervalSeconds: intervalSeconds,
-			Limit:           limit,
-			Rules:           rules,
-		}, nil
+		groups = append(groups, ruleGroup)
 	}
 
-	return coralogixv1.RecordingRuleGroupSpec{}, nil
+	return coralogixv1.RecordingRuleGroupSetSpec{
+		Groups: groups,
+	}, nil
 }
 
 func prometheusInnerRuleToCoralogixAlert(prometheusRule prometheus.Rule) coralogixv1.AlertSpec {

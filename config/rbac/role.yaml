@@ -34,7 +34,7 @@ rules:
 - apiGroups:
   - coralogix.coralogix
   resources:
-  - recordingrulegroups
+  - recordingrulegroupsets
   verbs:
   - create
   - delete
@@ -46,13 +46,13 @@ rules:
 - apiGroups:
   - coralogix.coralogix
   resources:
-  - recordingrulegroups/finalizers
+  - recordingrulegroupsets/finalizers
   verbs:
   - update
 - apiGroups:
   - coralogix.coralogix
   resources:
-  - recordingrulegroups/status
+  - recordingrulegroupsets/status
   verbs:
   - get
   - patch

@@ -21,48 +21,68 @@ import (
 	"reflect"
 
 	utils "coralogix-operator-poc/api"
-	recordingrules "coralogix-operator-poc/controllers/clientset/grpc/recording-rules-groups/v1"
+	rrg "coralogix-operator-poc/controllers/clientset/grpc/recording-rules-groups/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-// RecordingRuleGroupSpec defines the desired state of RecordingRuleGroup
-type RecordingRuleGroupSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-
-	Name string `json:"name,omitempty"`
-
-	// +optional
-	IntervalSeconds int32 `json:"intervalSeconds,omitempty"`
-
-	// +optional
-	Limit int64 `json:"limit,omitempty"`
-
-	Rules []RecordingRule `json:"rules,omitempty"`
+// RecordingRuleGroupSetSpec defines the desired state of RecordingRuleGroupSet
+type RecordingRuleGroupSetSpec struct {
+	Groups []RecordingRuleGroup `json:"groups,omitempty"`
 }
 
-func (in *RecordingRuleGroupSpec) ExtractCreateRecordingRuleGroupRequest() *recordingrules.RecordingRuleGroup {
+func (in *RecordingRuleGroupSetSpec) DeepEqual(status RecordingRuleGroupSetStatus) (bool, utils.Diff) {
+	if length, actualLength := len(in.Groups), len(status.Groups); length != actualLength {
+		return false, utils.Diff{
+			Name:    "Groups.Length",
+			Desired: length,
+			Actual:  actualLength,
+		}
+	}
+
+	for i := range in.Groups {
+		if equal, diff := in.Groups[i].DeepEqual(status.Groups[i]); !equal {
+			return false, utils.Diff{
+				Name:    fmt.Sprintf("Groups.%d.%s", i, diff.Name),
+				Desired: diff.Desired,
+				Actual:  diff.Actual,
+			}
+		}
+	}
+
+	return true, utils.Diff{}
+}
+
+func (in *RecordingRuleGroupSetSpec) ExtractRecordingRuleGroups() []*rrg.InRuleGroup {
+	result := make([]*rrg.InRuleGroup, 0, len(in.Groups))
+	for _, ruleGroup := range in.Groups {
+		rg := expandRecordingRuleGroup(ruleGroup)
+		result = append(result, rg)
+	}
+	return result
+}
+
+func expandRecordingRuleGroup(group RecordingRuleGroup) *rrg.InRuleGroup {
 	interval := new(uint32)
-	*interval = uint32(in.IntervalSeconds)
+	*interval = uint32(group.IntervalSeconds)
 
 	limit := new(uint64)
-	*limit = uint64(in.Limit)
+	*limit = uint64(group.Limit)
 
-	rules := expandRecordingRules(in.Rules)
+	rules := expandRecordingRules(group.Rules)
 
-	return &recordingrules.RecordingRuleGroup{
-		Name:     in.Name,
+	return &rrg.InRuleGroup{
+		Name:     group.Name,
 		Interval: interval,
 		Limit:    limit,
 		Rules:    rules,
 	}
 }
 
-func expandRecordingRules(rules []RecordingRule) []*recordingrules.RecordingRule {
-	result := make([]*recordingrules.RecordingRule, 0, len(rules))
+func expandRecordingRules(rules []RecordingRule) []*rrg.InRule {
+	result := make([]*rrg.InRule, 0, len(rules))
 	for _, r := range rules {
 		rule := extractRecordingRule(r)
 		result = append(result, rule)
@@ -70,16 +90,16 @@ func expandRecordingRules(rules []RecordingRule) []*recordingrules.RecordingRule
 	return result
 }
 
-func extractRecordingRule(rule RecordingRule) *recordingrules.RecordingRule {
-	return &recordingrules.RecordingRule{
+func extractRecordingRule(rule RecordingRule) *rrg.InRule {
+	return &rrg.InRule{
 		Record: rule.Record,
 		Expr:   rule.Expr,
 		Labels: rule.Labels,
 	}
 }
 
-func (in *RecordingRuleGroupSpec) DeepEqual(status RecordingRuleGroupStatus) (bool, utils.Diff) {
-	if limit, actualLimit := in.Limit, status.Limit; limit != actualLimit {
+func (in *RecordingRuleGroup) DeepEqual(actual RecordingRuleGroup) (bool, utils.Diff) {
+	if limit, actualLimit := in.Limit, actual.Limit; limit != actualLimit {
 		return false, utils.Diff{
 			Name:    "Limit",
 			Desired: limit,
@@ -87,7 +107,7 @@ func (in *RecordingRuleGroupSpec) DeepEqual(status RecordingRuleGroupStatus) (bo
 		}
 	}
 
-	if name, actualName := in.Name, *status.Name; name != actualName {
+	if name, actualName := in.Name, actual.Name; name != actualName {
 		return false, utils.Diff{
 			Name:    "Name",
 			Desired: name,
@@ -95,7 +115,7 @@ func (in *RecordingRuleGroupSpec) DeepEqual(status RecordingRuleGroupStatus) (bo
 		}
 	}
 
-	if interval, actualInterval := in.IntervalSeconds, status.IntervalSeconds; interval != actualInterval {
+	if interval, actualInterval := in.IntervalSeconds, actual.IntervalSeconds; interval != actualInterval {
 		return false, utils.Diff{
 			Name:    "Interval",
 			Desired: interval,
@@ -103,14 +123,14 @@ func (in *RecordingRuleGroupSpec) DeepEqual(status RecordingRuleGroupStatus) (bo
 		}
 	}
 
-	if equal, diff := DeepEqual(in.Rules, status.Rules); !equal {
+	if equal, diff := DeepEqualRecordingRules(in.Rules, actual.Rules); !equal {
 		return false, diff
 	}
 
 	return true, utils.Diff{}
 }
 
-func DeepEqual(desiredRules, actualRule []RecordingRule) (bool, utils.Diff) {
+func DeepEqualRecordingRules(desiredRules, actualRule []RecordingRule) (bool, utils.Diff) {
 	if length, actualLength := len(desiredRules), len(actualRule); length != actualLength {
 		return false, utils.Diff{
 			Name:    "Rules.length",
@@ -130,14 +150,6 @@ func DeepEqual(desiredRules, actualRule []RecordingRule) (bool, utils.Diff) {
 	}
 
 	return true, utils.Diff{}
-}
-
-type RecordingRule struct {
-	Record string `json:"record,omitempty"`
-
-	Expr string `json:"expr,omitempty"`
-
-	Labels map[string]string `json:"labels,omitempty"`
 }
 
 func (in *RecordingRule) DeepEqual(rule RecordingRule) (bool, utils.Diff) {
@@ -168,40 +180,56 @@ func (in *RecordingRule) DeepEqual(rule RecordingRule) (bool, utils.Diff) {
 	return true, utils.Diff{}
 }
 
-// RecordingRuleGroupStatus defines the observed state of RecordingRuleGroup
-type RecordingRuleGroupStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
+type RecordingRuleGroup struct {
+	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
-	Name *string `json:"name,omitempty"`
+	Name string `json:"name,omitempty"`
 
+	// +optional
 	IntervalSeconds int32 `json:"intervalSeconds,omitempty"`
 
+	// +optional
 	Limit int64 `json:"limit,omitempty"`
 
 	Rules []RecordingRule `json:"rules,omitempty"`
 }
 
+type RecordingRule struct {
+	Record string `json:"record,omitempty"`
+
+	Expr string `json:"expr,omitempty"`
+
+	Labels map[string]string `json:"labels,omitempty"`
+}
+
+// RecordingRuleGroupSetStatus defines the observed state of RecordingRuleGroupSet
+type RecordingRuleGroupSetStatus struct {
+	ID *string `json:"id"`
+
+	Groups []RecordingRuleGroup `json:"groups,omitempty"`
+}
+
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 
-// RecordingRuleGroup is the Schema for the recordingrulegroups API
-type RecordingRuleGroup struct {
+// RecordingRuleGroupSet is the Schema for the recordingrulegroupsets API
+type RecordingRuleGroupSet struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   RecordingRuleGroupSpec   `json:"spec,omitempty"`
-	Status RecordingRuleGroupStatus `json:"status,omitempty"`
+	Spec   RecordingRuleGroupSetSpec   `json:"spec,omitempty"`
+	Status RecordingRuleGroupSetStatus `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true
 
-// RecordingRuleGroupList contains a list of RecordingRuleGroup
-type RecordingRuleGroupList struct {
+// RecordingRuleGroupSetList contains a list of RecordingRuleGroupSet
+type RecordingRuleGroupSetList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []RecordingRuleGroup `json:"items"`
+	Items           []RecordingRuleGroupSet `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&RecordingRuleGroup{}, &RecordingRuleGroupList{})
+	SchemeBuilder.Register(&RecordingRuleGroupSet{}, &RecordingRuleGroupSetList{})
 }
