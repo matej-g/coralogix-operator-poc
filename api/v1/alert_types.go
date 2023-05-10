@@ -162,12 +162,18 @@ func (in *AlertSpec) ExtractCreateAlertRequest() *alerts.CreateAlertRequest {
 	severity := AlertSchemaSeverityToProtoSeverity[in.Severity]
 	metaLabels := expandMetaLabels(in.Labels)
 	expirationDate := expandExpirationDate(in.ExpirationDate)
-	notifications := expandNotifications(in.Notifications.Recipients)
-	notifyEvery := expandNotifyEvery(in.Notifications.NotifyEveryMin)
+	var notifications *alerts.AlertNotifications
+	var notifyEvery *wrapperspb.DoubleValue
+	var onTriggerAndResolved, notifyOnlyOnTriggeredGroupByValues bool
+	if in.Notifications != nil {
+		notifications = expandNotifications(in.Notifications.Recipients)
+		notifyEvery = expandNotifyEvery(in.Notifications.NotifyEveryMin)
+		onTriggerAndResolved = in.Notifications.OnTriggerAndResolved
+		notifyOnlyOnTriggeredGroupByValues = in.Notifications.NotifyOnlyOnTriggeredGroupByValues
+	}
 	payloadFilters := utils.StringSliceToWrappedStringSlice(in.PayloadFilters)
 	activeWhen := expandActiveWhen(in.Scheduling)
-	alertTypeParams := expandAlertType(in.AlertType, in.Notifications.OnTriggerAndResolved,
-		in.Notifications.NotifyOnlyOnTriggeredGroupByValues)
+	alertTypeParams := expandAlertType(in.AlertType, onTriggerAndResolved, notifyOnlyOnTriggeredGroupByValues)
 
 	return &alerts.CreateAlertRequest{
 		Name:                       name,
@@ -1081,12 +1087,14 @@ func (in *AlertSpec) DeepEqual(actualAlert *AlertStatus) (bool, utils.Diff) {
 		}
 	}
 
-	if scheduling, actualScheduling := in.Scheduling, actualAlert.Scheduling; scheduling == nil && actualScheduling != nil {
+	if scheduling, actualScheduling := in.Scheduling, actualAlert.Scheduling; (scheduling == nil && actualScheduling != nil) || (scheduling != nil && actualScheduling == nil) {
 		return false, utils.Diff{
 			Name:    "Scheduling",
 			Desired: scheduling,
 			Actual:  actualScheduling,
 		}
+	} else if actualScheduling == nil {
+
 	} else if equal, diff := scheduling.DeepEqual(*actualScheduling); !equal {
 		return false, utils.Diff{
 			Name:    fmt.Sprintf("Scheduling.%s", diff.Name),
@@ -2387,6 +2395,22 @@ const (
 
 // +kubebuilder:validation:Enum=FiveMinutes;TenMinutes;FifteenMinutes;TwentyMinutes;ThirtyMinutes;Hour;TwoHours;FourHours;SixHours;TwelveHours;TwentyFourHours;ThirtySixHours
 type TimeWindow string
+
+const (
+	TimeWindowMinute          TimeWindow = "Minute"
+	TimeWindowFiveMinutes     TimeWindow = "FiveMinutes"
+	TimeWindowTenMinutes      TimeWindow = "TenMinutes"
+	TimeWindowFifteenMinutes  TimeWindow = "FifteenMinutes"
+	TimeWindowTwentyMinutes   TimeWindow = "TwentyMinutes"
+	TimeWindowThirtyMinutes   TimeWindow = "ThirtyMinutes"
+	TimeWindowHour            TimeWindow = "Hour"
+	TimeWindowTwoHours        TimeWindow = "TwoHours"
+	TimeWindowFourHours       TimeWindow = "FourHours"
+	TimeWindowSixHours        TimeWindow = "SixHours"
+	TimeWindowTwelveHours     TimeWindow = "TwelveHours"
+	TimeWindowTwentyFourHours TimeWindow = "TwentyFourHours"
+	TimeWindowThirtySixHours  TimeWindow = "ThirtySixHours"
+)
 
 // +kubebuilder:validation:Enum=TwelveHours;TwentyFourHours;FortyEightHours;SeventTwoHours;Week;Month;TwoMonths;ThreeMonths;
 type NewValueTimeWindow string
