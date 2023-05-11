@@ -22,7 +22,6 @@ spec:
           for: 5m
           annotations:
             cxAlertName: alert-name2
-            cxNotifyEveryMin: "15"
             cxMinNonNullValuesPercentage: "20"
     - name: example.rules2
       interval: "70s"
@@ -36,5 +35,4 @@ spec:
             for: 5m
             annotations:
               cxAlertName: alert-name
-              cxNotifyEveryMin: "15"
               cxMinNonNullValuesPercentage: "20"
