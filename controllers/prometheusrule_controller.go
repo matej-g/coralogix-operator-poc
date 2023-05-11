@@ -4,11 +4,13 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	coralogixv1 "coralogix-operator-poc/api/v1"
 	"coralogix-operator-poc/controllers/clientset"
 	prometheus "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	"github.com/prometheus/prometheus/promql/parser"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -129,13 +131,6 @@ func createAndTrackRecordingRules(prometheusRule *prometheus.PrometheusRule) boo
 	return false
 }
 
-func createAndTrackAlerts(prometheusRule *prometheus.PrometheusRule) bool {
-	if toCreateStr, ok := prometheusRule.Labels["cxCreateAndTrackAlerts"]; ok && toCreateStr == "true" {
-		return true
-	}
-	return false
-}
-
 func prometheusRuleToRuleGroupSet(prometheusRule *prometheus.PrometheusRule) (coralogixv1.RecordingRuleGroupSetSpec, error) {
 	groups := make([]coralogixv1.RecordingRuleGroup, 0)
 	for _, group := range prometheusRule.Spec.Groups {
@@ -174,7 +169,23 @@ func prometheusInnerRuleToCoralogixAlert(prometheusRule prometheus.Rule) coralog
 	}
 
 	timeWindow := prometheusAlertForToCoralogixPromqlAlertTimeWindow[prometheusRule.For]
-	//expr, _ := promql.ParseExpr(prometheusRule.Expr.StrVal)
+
+	expr, _ := parser.ParseExpr(prometheusRule.Expr.StrVal)
+	c := parser.Children(expr)
+	thresholdStr := c[1].String()
+	threshold := resource.MustParse(thresholdStr)
+
+	query := c[0].String()
+
+	symbol := strings.Replace(expr.String(), query, "", 1)
+	symbol = strings.Replace(symbol, thresholdStr, "", 1)
+	symbol = strings.ReplaceAll(symbol, " ", "")
+	var alertWhen coralogixv1.AlertWhen
+	if symbol == ">" {
+		alertWhen = coralogixv1.AlertWhenMoreThan
+	} else {
+		alertWhen = coralogixv1.AlertWhenLessThan
+	}
 
 	return coralogixv1.AlertSpec{
 		Severity: coralogixv1.AlertSeverityInfo,
@@ -185,11 +196,11 @@ func prometheusInnerRuleToCoralogixAlert(prometheusRule prometheus.Rule) coralog
 		AlertType: coralogixv1.AlertType{
 			Metric: &coralogixv1.Metric{
 				Promql: &coralogixv1.Promql{
-					SearchQuery: prometheusRule.Expr.StrVal,
+					SearchQuery: query,
 					Conditions: coralogixv1.PromqlConditions{
 						TimeWindow:                 timeWindow,
-						AlertWhen:                  coralogixv1.AlertWhenLessThan,
-						Threshold:                  resource.MustParse("5"),
+						AlertWhen:                  alertWhen,
+						Threshold:                  threshold,
 						SampleThresholdPercentage:  100,
 						MinNonNullValuesPercentage: &minNonNullValuesPercentage,
 					},
