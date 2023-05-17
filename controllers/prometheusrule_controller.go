@@ -4,17 +4,17 @@ import (
 	"context"
 	"fmt"
 	"strconv"
-	"strings"
 	"time"
 
 	coralogixv1 "coralogix-operator-poc/api/v1"
 	"coralogix-operator-poc/controllers/clientset"
+
 	prometheus "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
-	"github.com/prometheus/prometheus/promql/parser"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/pointer"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -23,6 +23,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+)
+
+const (
+	defaultCoralogixNotificationPeriod int = 5
 )
 
 //+kubebuilder:rbac:groups=monitoring.coreos.com,resources=prometheusrules,verbs=get;list;watch
@@ -155,54 +159,36 @@ func prometheusRuleToRuleGroupSet(prometheusRule *prometheus.PrometheusRule) (co
 }
 
 func prometheusInnerRuleToCoralogixAlert(prometheusRule prometheus.Rule) coralogixv1.AlertSpec {
-	notifyEveryMin := 0
+	var notificationPeriod int
 	if cxNotifyEveryMin, ok := prometheusRule.Annotations["cxNotifyEveryMin"]; ok {
-		notifyEveryMin, _ = strconv.Atoi(cxNotifyEveryMin)
+		notificationPeriod, _ = strconv.Atoi(cxNotifyEveryMin)
 	} else {
 		duration, _ := time.ParseDuration(string(prometheusRule.For))
-		notifyEveryMin = int(duration.Minutes())
+		notificationPeriod = int(duration.Minutes())
 	}
-
-	minNonNullValuesPercentage := 0
-	if cxMinNonNullValuesPercentage, ok := prometheusRule.Annotations["cxMinNonNullValuesPercentage"]; ok {
-		minNonNullValuesPercentage, _ = strconv.Atoi(cxMinNonNullValuesPercentage)
+	
+	if notificationPeriod == 0 {
+		notificationPeriod = defaultCoralogixNotificationPeriod
 	}
 
 	timeWindow := prometheusAlertForToCoralogixPromqlAlertTimeWindow[prometheusRule.For]
 
-	expr, _ := parser.ParseExpr(prometheusRule.Expr.StrVal)
-	c := parser.Children(expr)
-	thresholdStr := c[1].String()
-	threshold := resource.MustParse(thresholdStr)
-
-	query := c[0].String()
-
-	symbol := strings.Replace(expr.String(), query, "", 1)
-	symbol = strings.Replace(symbol, thresholdStr, "", 1)
-	symbol = strings.ReplaceAll(symbol, " ", "")
-	var alertWhen coralogixv1.AlertWhen
-	if symbol == ">" {
-		alertWhen = coralogixv1.AlertWhenMoreThan
-	} else {
-		alertWhen = coralogixv1.AlertWhenLessThan
-	}
-
 	return coralogixv1.AlertSpec{
 		Severity: coralogixv1.AlertSeverityInfo,
 		Notifications: &coralogixv1.Notifications{
-			NotifyEveryMin: &notifyEveryMin,
+			NotifyEveryMin: &notificationPeriod,
 		},
 		Name: prometheusRule.Alert,
 		AlertType: coralogixv1.AlertType{
 			Metric: &coralogixv1.Metric{
 				Promql: &coralogixv1.Promql{
-					SearchQuery: query,
+					SearchQuery: prometheusRule.Expr.StrVal,
 					Conditions: coralogixv1.PromqlConditions{
 						TimeWindow:                 timeWindow,
-						AlertWhen:                  alertWhen,
-						Threshold:                  threshold,
+						AlertWhen:                  coralogixv1.AlertWhenMoreThan,
+						Threshold:                  resource.MustParse("0"),
 						SampleThresholdPercentage:  100,
-						MinNonNullValuesPercentage: &minNonNullValuesPercentage,
+						MinNonNullValuesPercentage: pointer.Int(0),
 					},
 				},
 			},
