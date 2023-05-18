@@ -8,11 +8,13 @@ import (
 
 	coralogixv1 "coralogix-operator-poc/api/v1"
 	"coralogix-operator-poc/controllers/clientset"
+
 	prometheus "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/pointer"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -21,6 +23,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+)
+
+const (
+	defaultCoralogixNotificationPeriod int = 5
 )
 
 //+kubebuilder:rbac:groups=monitoring.coreos.com,resources=prometheusrules,verbs=get;list;watch
@@ -129,13 +135,6 @@ func createAndTrackRecordingRules(prometheusRule *prometheus.PrometheusRule) boo
 	return false
 }
 
-func createAndTrackAlerts(prometheusRule *prometheus.PrometheusRule) bool {
-	if toCreateStr, ok := prometheusRule.Labels["cxCreateAndTrackAlerts"]; ok && toCreateStr == "true" {
-		return true
-	}
-	return false
-}
-
 func prometheusRuleToRuleGroupSet(prometheusRule *prometheus.PrometheusRule) (coralogixv1.RecordingRuleGroupSetSpec, error) {
 	groups := make([]coralogixv1.RecordingRuleGroup, 0)
 	for _, group := range prometheusRule.Spec.Groups {
@@ -160,26 +159,24 @@ func prometheusRuleToRuleGroupSet(prometheusRule *prometheus.PrometheusRule) (co
 }
 
 func prometheusInnerRuleToCoralogixAlert(prometheusRule prometheus.Rule) coralogixv1.AlertSpec {
-	notifyEveryMin := 0
+	var notificationPeriod int
 	if cxNotifyEveryMin, ok := prometheusRule.Annotations["cxNotifyEveryMin"]; ok {
-		notifyEveryMin, _ = strconv.Atoi(cxNotifyEveryMin)
+		notificationPeriod, _ = strconv.Atoi(cxNotifyEveryMin)
 	} else {
 		duration, _ := time.ParseDuration(string(prometheusRule.For))
-		notifyEveryMin = int(duration.Minutes())
+		notificationPeriod = int(duration.Minutes())
 	}
 
-	minNonNullValuesPercentage := 0
-	if cxMinNonNullValuesPercentage, ok := prometheusRule.Annotations["cxMinNonNullValuesPercentage"]; ok {
-		minNonNullValuesPercentage, _ = strconv.Atoi(cxMinNonNullValuesPercentage)
+	if notificationPeriod == 0 {
+		notificationPeriod = defaultCoralogixNotificationPeriod
 	}
 
 	timeWindow := prometheusAlertForToCoralogixPromqlAlertTimeWindow[prometheusRule.For]
-	//expr, _ := promql.ParseExpr(prometheusRule.Expr.StrVal)
 
 	return coralogixv1.AlertSpec{
 		Severity: coralogixv1.AlertSeverityInfo,
 		Notifications: &coralogixv1.Notifications{
-			NotifyEveryMin: &notifyEveryMin,
+			NotifyEveryMin: &notificationPeriod,
 		},
 		Name: prometheusRule.Alert,
 		AlertType: coralogixv1.AlertType{
@@ -188,10 +185,10 @@ func prometheusInnerRuleToCoralogixAlert(prometheusRule prometheus.Rule) coralog
 					SearchQuery: prometheusRule.Expr.StrVal,
 					Conditions: coralogixv1.PromqlConditions{
 						TimeWindow:                 timeWindow,
-						AlertWhen:                  coralogixv1.AlertWhenLessThan,
-						Threshold:                  resource.MustParse("5"),
+						AlertWhen:                  coralogixv1.AlertWhenMoreThan,
+						Threshold:                  resource.MustParse("0"),
 						SampleThresholdPercentage:  100,
-						MinNonNullValuesPercentage: &minNonNullValuesPercentage,
+						MinNonNullValuesPercentage: pointer.Int(0),
 					},
 				},
 			},
