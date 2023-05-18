@@ -128,14 +128,6 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "Alert")
 		os.Exit(1)
 	}
-	if err = (&controllers.RecordingRuleGroupSetReconciler{
-		CoralogixClientSet: clientset.NewClientSet(targetUrl, apiKey),
-		Client:             mgr.GetClient(),
-		Scheme:             mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "RecordingRuleGroupSet")
-		os.Exit(1)
-	}
 	if err = (&controllers.PrometheusRuleReconciler{
 		CoralogixClientSet: clientset.NewClientSet(targetUrl, apiKey),
 		Client:             mgr.GetClient(),
