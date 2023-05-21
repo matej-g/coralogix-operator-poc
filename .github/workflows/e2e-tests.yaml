@@ -47,18 +47,12 @@ jobs:
           curl -Lo /usr/local/bin/kubectl-kuttl https://github.com/kudobuilder/kuttl/releases/download/v0.12.1/kubectl-kuttl_0.12.1_linux_x86_64
           chmod +x /usr/local/bin/kubectl-kuttl
           export PATH=$PATH:/usr/local/bin
-      - name: Install docker
+      - name: Create k8s Kind Cluster
+        uses: helm/kind-action@v1.4.0
+      - name: Test
         run: |
-          apt-get update && apt-get install --no-install-recommends -y ca-certificates curl gnupg lsb-release sudo
-          curl -fsSL https://download.docker.com/linux/debian/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
-          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/debian $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-          apt-get update && apt-get install --no-install-recommends -y docker-ce docker-ce-cli containerd.io
-      - name: run kind
-        run: |
-          go install sigs.k8s.io/kind@latest && kind create cluster
-      - name: docker ps
-        run: |
-          export KUBE_CONFIG_PATH=~/.kube/config && kind get clusters && kubectl cluster-info --context kind-kind
+          kubectl cluster-info
+          kubectl get storageclass standard
       - name: Tests
         run: |
           export KUBE_CONFIG_PATH=~/.kube/config
