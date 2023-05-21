@@ -25,23 +25,20 @@ jobs:
   tests:
     name: Tests
     runs-on: ubuntu-latest
-    #container: docker.io/library/golang:latest
     steps:
       - name: Checkout
         uses: actions/checkout@v2
       - name: Create k8s Kind Cluster
         uses: helm/kind-action@v1.4.0
-      - name: Test
-        run: |
-          kubectl cluster-info
-          kubectl get storageclass standard
       - name: Install kuttl
         run: |
           curl -Lo /usr/local/bin/kubectl-kuttl https://github.com/kudobuilder/kuttl/releases/download/v0.12.1/kubectl-kuttl_0.12.1_linux_x86_64
           chmod +x /usr/local/bin/kubectl-kuttl
           export PATH=$PATH:/usr/local/bin
-
+      - name: Tests
+          run: |
+            make generate
       - name: Tests
         run: |
-          export KUBE_CONFIG_PATH=~/.kube/config
-          kubectl kuttl test ./tests/e2e/
+#                    export KUBE_CONFIG_PATH=~/.kube/config
+               make e2e
