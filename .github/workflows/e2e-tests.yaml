@@ -37,8 +37,8 @@ jobs:
           export PATH=$PATH:/usr/local/bin
       - name: generate
         run: |
-            make generate
+          make generate
       - name: Tests
         run: |
 #                    export KUBE_CONFIG_PATH=~/.kube/config
-            make e2e
+          make e2e
