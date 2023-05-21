@@ -29,8 +29,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-      - name: OS Dependencies
-        run: apt-get update && apt-get install -y tar make gcc
       - name: Install Kubebuilder
         run: |
           os=$(go env GOOS)
