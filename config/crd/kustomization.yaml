@@ -5,6 +5,7 @@ resources:
 - bases/coralogix.coralogix_rulegroups.yaml
 - bases/coralogix.coralogix_alerts.yaml
 - bases/coralogix.coralogix_recordingrulegroupsets.yaml
+- bases/monitoring.coreos.com_prometheusrules.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
 
 patchesStrategicMerge:
