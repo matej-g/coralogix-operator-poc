@@ -58,7 +58,7 @@ jobs:
           go install sigs.k8s.io/kind@latest && kind create cluster
       - name: docker ps
         run: |
-          kind get clusters && kubectl cluster-info
+          export KUBE_CONFIG_PATH=~/.kube/config && kind get clusters && kubectl cluster-info --context kind-kind
       - name: Tests
         run: |
           export KUBE_CONFIG_PATH=~/.kube/config
