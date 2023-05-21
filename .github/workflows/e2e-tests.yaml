@@ -55,7 +55,7 @@ jobs:
           apt-get update && apt-get install --no-install-recommends -y docker-ce docker-ce-cli containerd.io
       - name: run kind
         run: |
-          kind create cluster
+          go install sigs.k8s.io/kind@latest && kind create cluster
       - name: docker ps
         run: |
           docker ps -a
