@@ -166,7 +166,7 @@ func prometheusInnerRuleToCoralogixAlert(prometheusRule prometheus.Rule) coralog
 		duration, _ := time.ParseDuration(string(prometheusRule.For))
 		notificationPeriod = int(duration.Minutes())
 	}
-
+	
 	if notificationPeriod == 0 {
 		notificationPeriod = defaultCoralogixNotificationPeriod
 	}
