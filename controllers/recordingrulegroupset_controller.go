@@ -166,8 +166,8 @@ func (r *RecordingRuleGroupSetReconciler) Reconcile(ctx context.Context, req ctr
 		log.V(1).Info("Find diffs between spec and the actual state", "Diff", diff)
 		id := *ruleGroupSetCRD.Status.ID
 		groups := ruleGroupSetCRD.Spec.ExtractRecordingRuleGroups()
-		updateRRGReq := rrg.UpdateRuleGroupSet{Id: id, Groups: groups}
-		if updateRRGResp, err := rRGClient.UpdateRecordingRuleGroupSet(ctx, &updateRRGReq); err != nil {
+		updateRRGReq := &rrg.UpdateRuleGroupSet{Id: id, Groups: groups}
+		if updateRRGResp, err := rRGClient.UpdateRecordingRuleGroupSet(ctx, updateRRGReq); err != nil {
 			log.Error(err, "Received an error while updating a RecordingRuleGroupSet", "recordingRuleGroup", updateRRGReq)
 			return ctrl.Result{RequeueAfter: defaultErrRequeuePeriod}, err
 		} else {
