@@ -14,15 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1
+package v1alpha1
 
 import (
 	"fmt"
 	"reflect"
 
-	utils "coralogix-operator-poc/api"
-	rrg "coralogix-operator-poc/controllers/clientset/grpc/recording-rules-groups/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	rrg "coralogix-operator-poc/controllers/clientset/grpc/recording-rules-groups/v2"
+	utils "coralogix-operator-poc/apis"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -211,6 +211,7 @@ type RecordingRuleGroupSetStatus struct {
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
+//+kubebuilder:storageversion
 
 // RecordingRuleGroupSet is the Schema for the recordingrulegroupsets API
 type RecordingRuleGroupSet struct {

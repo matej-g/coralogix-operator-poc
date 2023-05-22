@@ -1,11 +1,11 @@
-apiVersion: coralogix.coralogix/v1
+apiVersion: coralogix.coralogix/v1alpha1
 kind: RecordingRuleGroupSet
 metadata:
   labels:
     app.kubernetes.io/name: recordingrulegroupset
     app.kubernetes.io/instance: recordingrulegroupset-sample
     app.kubernetes.io/part-of: coralogix-operator-poc
-    app.kuberentes.io/managed-by: kustomize
+    app.kubernetes.io/managed-by: kustomize
     app.kubernetes.io/created-by: coralogix-operator-poc
   name: recordingrulegroupset-sample
 spec:

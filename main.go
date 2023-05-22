@@ -38,7 +38,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	coralogixv1 "coralogix-operator-poc/api/v1"
+	coralogixv1alpha1 "coralogix-operator-poc/apis/coralogix/v1alpha1"
 	"coralogix-operator-poc/controllers"
+	"coralogix-operator-poc/controllers/alphacontrollers"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -62,6 +64,7 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
 	utilruntime.Must(coralogixv1.AddToScheme(scheme))
+	utilruntime.Must(coralogixv1alpha1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 
@@ -125,20 +128,20 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "Alert")
 		os.Exit(1)
 	}
-	if err = (&controllers.RecordingRuleGroupSetReconciler{
-		CoralogixClientSet: clientset.NewClientSet(targetUrl, apiKey),
-		Client:             mgr.GetClient(),
-		Scheme:             mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "RecordingRuleGroupSet")
-		os.Exit(1)
-	}
 	if err = (&controllers.PrometheusRuleReconciler{
 		CoralogixClientSet: clientset.NewClientSet(targetUrl, apiKey),
 		Client:             mgr.GetClient(),
 		Scheme:             mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "RecordingRuleGroup")
+		os.Exit(1)
+	}
+	if err = (&alphacontrollers.RecordingRuleGroupSetReconciler{
+		CoralogixClientSet: clientset.NewClientSet(targetUrl, apiKey),
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "RecordingRuleGroupSet")
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder

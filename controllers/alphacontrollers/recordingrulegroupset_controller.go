@@ -14,23 +14,25 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controllers
+package alphacontrollers
 
 import (
 	"context"
 
-	coralogixv1 "coralogix-operator-poc/api/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	coralogixv1alpha1 "coralogix-operator-poc/apis/coralogix/v1alpha1"
 	"coralogix-operator-poc/controllers/clientset"
 	rrg "coralogix-operator-poc/controllers/clientset/grpc/recording-rules-groups/v2"
+
 	"github.com/golang/protobuf/jsonpb"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
-	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 // RecordingRuleGroupSetReconciler reconciles a RecordingRuleGroupSet object
@@ -52,7 +54,7 @@ type RecordingRuleGroupSetReconciler struct {
 // the user.
 //
 // For more details, check Reconcile and its Result here:
-// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.13.0/pkg/reconcile
+// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.4/pkg/reconcile
 func (r *RecordingRuleGroupSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := log.FromContext(ctx)
 	jsm := &jsonpb.Marshaler{
@@ -61,7 +63,7 @@ func (r *RecordingRuleGroupSetReconciler) Reconcile(ctx context.Context, req ctr
 	rRGClient := r.CoralogixClientSet.RecordingRuleGroups()
 
 	//Get ruleGroupSetRD
-	ruleGroupSetCRD := &coralogixv1.RecordingRuleGroupSet{}
+	ruleGroupSetCRD := &coralogixv1alpha1.RecordingRuleGroupSet{}
 	if err := r.Client.Get(ctx, req.NamespacedName, ruleGroupSetCRD); err != nil {
 		if errors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
@@ -123,7 +125,7 @@ func (r *RecordingRuleGroupSetReconciler) Reconcile(ctx context.Context, req ctr
 
 	var notFount bool
 	var err error
-	var actualState coralogixv1.RecordingRuleGroupSetStatus
+	var actualState coralogixv1alpha1.RecordingRuleGroupSetStatus
 	if id := ruleGroupSetCRD.Status.ID; id == nil {
 		log.V(1).Info("RecordingRuleGroupSet wasn't created in Coralogix backend")
 		notFount = true
@@ -191,28 +193,28 @@ func (r *RecordingRuleGroupSetReconciler) Reconcile(ctx context.Context, req ctr
 	return ctrl.Result{RequeueAfter: defaultRequeuePeriod}, nil
 }
 
-func flattenRecordingRuleGroupSet(set *rrg.OutRuleGroupSet) coralogixv1.RecordingRuleGroupSetStatus {
+func flattenRecordingRuleGroupSet(set *rrg.OutRuleGroupSet) coralogixv1alpha1.RecordingRuleGroupSetStatus {
 	id := new(string)
 	*id = set.Id
 
-	groups := make([]coralogixv1.RecordingRuleGroup, 0, len(set.Groups))
+	groups := make([]coralogixv1alpha1.RecordingRuleGroup, 0, len(set.Groups))
 	for _, ruleGroup := range set.Groups {
 		rg := flattenRecordingRuleGroup(ruleGroup)
 		groups = append(groups, rg)
 	}
 
-	return coralogixv1.RecordingRuleGroupSetStatus{
+	return coralogixv1alpha1.RecordingRuleGroupSetStatus{
 		ID:     id,
 		Groups: groups,
 	}
 }
 
-func flattenRecordingRuleGroup(rRG *rrg.OutRuleGroup) coralogixv1.RecordingRuleGroup {
+func flattenRecordingRuleGroup(rRG *rrg.OutRuleGroup) coralogixv1alpha1.RecordingRuleGroup {
 	interval := int32(*rRG.Interval)
 	limit := int64(*rRG.Limit)
 	rules := flattenRecordingRules(rRG.Rules)
 
-	return coralogixv1.RecordingRuleGroup{
+	return coralogixv1alpha1.RecordingRuleGroup{
 		Name:            rRG.Name,
 		IntervalSeconds: interval,
 		Limit:           limit,
@@ -220,8 +222,8 @@ func flattenRecordingRuleGroup(rRG *rrg.OutRuleGroup) coralogixv1.RecordingRuleG
 	}
 }
 
-func flattenRecordingRules(rules []*rrg.OutRule) []coralogixv1.RecordingRule {
-	result := make([]coralogixv1.RecordingRule, 0, len(rules))
+func flattenRecordingRules(rules []*rrg.OutRule) []coralogixv1alpha1.RecordingRule {
+	result := make([]coralogixv1alpha1.RecordingRule, 0, len(rules))
 	for _, r := range rules {
 		rule := flattenRecordingRule(r)
 		result = append(result, rule)
@@ -229,17 +231,16 @@ func flattenRecordingRules(rules []*rrg.OutRule) []coralogixv1.RecordingRule {
 	return result
 }
 
-func flattenRecordingRule(rule *rrg.OutRule) coralogixv1.RecordingRule {
-	return coralogixv1.RecordingRule{
+func flattenRecordingRule(rule *rrg.OutRule) coralogixv1alpha1.RecordingRule {
+	return coralogixv1alpha1.RecordingRule{
 		Record: rule.Record,
 		Expr:   rule.Expr,
 		Labels: rule.Labels,
 	}
 }
 
-// SetupWithManager sets up the controller with the Manager.
 func (r *RecordingRuleGroupSetReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&coralogixv1.RecordingRuleGroupSet{}).
+		For(&coralogixv1alpha1.RecordingRuleGroupSet{}).
 		Complete(r)
 }

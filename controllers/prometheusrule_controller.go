@@ -7,6 +7,7 @@ import (
 	"time"
 
 	coralogixv1 "coralogix-operator-poc/api/v1"
+	coralogixv1alpha1 "coralogix-operator-poc/apis/coralogix/v1alpha1"
 	"coralogix-operator-poc/controllers/clientset"
 
 	prometheus "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
@@ -62,7 +63,7 @@ func (r *PrometheusRuleReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}
 
 	if shouldTrackRecordingRules(prometheusRuleCRD) {
-		ruleGroupSetCRD := &coralogixv1.RecordingRuleGroupSet{}
+		ruleGroupSetCRD := &coralogixv1alpha1.RecordingRuleGroupSet{}
 		if err := r.Client.Get(ctx, req.NamespacedName, ruleGroupSetCRD); err != nil {
 			if errors.IsNotFound(err) {
 				log.V(1).Info(fmt.Sprintf("Couldn't find RecordingRuleSet Namespace: %s, Name: %s. Trying to create.", req.Namespace, req.Name))
@@ -135,15 +136,15 @@ func shouldTrackRecordingRules(prometheusRule *prometheus.PrometheusRule) bool {
 	return false
 }
 
-func prometheusRuleToRuleGroupSet(prometheusRule *prometheus.PrometheusRule) (coralogixv1.RecordingRuleGroupSetSpec, error) {
-	groups := make([]coralogixv1.RecordingRuleGroup, 0)
+func prometheusRuleToRuleGroupSet(prometheusRule *prometheus.PrometheusRule) (coralogixv1alpha1.RecordingRuleGroupSetSpec, error) {
+	groups := make([]coralogixv1alpha1.RecordingRuleGroup, 0)
 	for _, group := range prometheusRule.Spec.Groups {
 		duration, _ := time.ParseDuration(string(group.Interval))
 		intervalSeconds := int32(duration.Seconds())
 
 		rules := prometheusInnerRulesToCoralogixInnerRules(group.Rules)
 
-		ruleGroup := coralogixv1.RecordingRuleGroup{
+		ruleGroup := coralogixv1alpha1.RecordingRuleGroup{
 			Name:            group.Name,
 			IntervalSeconds: intervalSeconds,
 			Limit:           60,
@@ -153,7 +154,7 @@ func prometheusRuleToRuleGroupSet(prometheusRule *prometheus.PrometheusRule) (co
 		groups = append(groups, ruleGroup)
 	}
 
-	return coralogixv1.RecordingRuleGroupSetSpec{
+	return coralogixv1alpha1.RecordingRuleGroupSetSpec{
 		Groups: groups,
 	}, nil
 }
@@ -211,8 +212,8 @@ var prometheusAlertForToCoralogixPromqlAlertTimeWindow = map[prometheus.Duration
 	"24h": coralogixv1.MetricTimeWindow(coralogixv1.TimeWindowTwentyFourHours),
 }
 
-func prometheusInnerRulesToCoralogixInnerRules(rules []prometheus.Rule) []coralogixv1.RecordingRule {
-	result := make([]coralogixv1.RecordingRule, 0)
+func prometheusInnerRulesToCoralogixInnerRules(rules []prometheus.Rule) []coralogixv1alpha1.RecordingRule {
+	result := make([]coralogixv1alpha1.RecordingRule, 0)
 	for _, r := range rules {
 		if r.Record != "" {
 			rule := prometheusInnerRuleToCoralogixInnerRule(r)
@@ -222,8 +223,8 @@ func prometheusInnerRulesToCoralogixInnerRules(rules []prometheus.Rule) []coralo
 	return result
 }
 
-func prometheusInnerRuleToCoralogixInnerRule(rule prometheus.Rule) coralogixv1.RecordingRule {
-	return coralogixv1.RecordingRule{
+func prometheusInnerRuleToCoralogixInnerRule(rule prometheus.Rule) coralogixv1alpha1.RecordingRule {
+	return coralogixv1alpha1.RecordingRule{
 		Record: rule.Record,
 		Expr:   rule.Expr.StrVal,
 		Labels: rule.Labels,
