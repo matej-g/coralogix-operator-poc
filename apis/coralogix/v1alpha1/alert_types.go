@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1
+package v1alpha1
 
 import (
 	"fmt"
@@ -23,7 +23,7 @@ import (
 	"strings"
 	"time"
 
-	utils "coralogix-operator-poc/api"
+	utils "coralogix-operator-poc/apis"
 	alerts "coralogix-operator-poc/controllers/clientset/grpc/alerts/v1"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -124,9 +124,6 @@ type ProtoTimeFrameAndRelativeTimeFrame struct {
 
 // AlertSpec defines the desired state of Alert
 type AlertSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-
 	//+kubebuilder:validation:MinLength=0
 	Name string `json:"name,omitempty"`
 
@@ -2926,8 +2923,6 @@ type FlowOperator string
 
 // AlertStatus defines the observed state of Alert
 type AlertStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
 	ID *string `json:"id"`
 
 	Name string `json:"name,omitempty"`
@@ -2953,6 +2948,7 @@ type AlertStatus struct {
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
+//+kubebuilder:storageversion
 
 // Alert is the Schema for the alerts API
 type Alert struct {

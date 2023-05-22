@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"time"
 
-	coralogixv1 "coralogix-operator-poc/api/v1"
 	coralogixv1alpha1 "coralogix-operator-poc/apis/coralogix/v1alpha1"
 	"coralogix-operator-poc/controllers/clientset"
 
@@ -99,7 +98,7 @@ func (r *PrometheusRuleReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	for _, group := range prometheusRuleCRD.Spec.Groups {
 		for _, rule := range group.Rules {
 			if alertName := rule.Annotations["cxAlertName"]; rule.Alert != "" && alertName != "" {
-				alertCRD := &coralogixv1.Alert{}
+				alertCRD := &coralogixv1alpha1.Alert{}
 				req.Name = alertName
 				if err := r.Client.Get(ctx, req.NamespacedName, alertCRD); err != nil {
 					if errors.IsNotFound(err) {
@@ -159,7 +158,7 @@ func prometheusRuleToRuleGroupSet(prometheusRule *prometheus.PrometheusRule) (co
 	}, nil
 }
 
-func prometheusInnerRuleToCoralogixAlert(prometheusRule prometheus.Rule) coralogixv1.AlertSpec {
+func prometheusInnerRuleToCoralogixAlert(prometheusRule prometheus.Rule) coralogixv1alpha1.AlertSpec {
 	var notificationPeriod int
 	if cxNotifyEveryMin, ok := prometheusRule.Annotations["cxNotifyEveryMin"]; ok {
 		notificationPeriod, _ = strconv.Atoi(cxNotifyEveryMin)
@@ -174,19 +173,19 @@ func prometheusInnerRuleToCoralogixAlert(prometheusRule prometheus.Rule) coralog
 
 	timeWindow := prometheusAlertForToCoralogixPromqlAlertTimeWindow[prometheusRule.For]
 
-	return coralogixv1.AlertSpec{
-		Severity: coralogixv1.AlertSeverityInfo,
-		Notifications: &coralogixv1.Notifications{
+	return coralogixv1alpha1.AlertSpec{
+		Severity: coralogixv1alpha1.AlertSeverityInfo,
+		Notifications: &coralogixv1alpha1.Notifications{
 			NotifyEveryMin: &notificationPeriod,
 		},
 		Name: prometheusRule.Alert,
-		AlertType: coralogixv1.AlertType{
-			Metric: &coralogixv1.Metric{
-				Promql: &coralogixv1.Promql{
+		AlertType: coralogixv1alpha1.AlertType{
+			Metric: &coralogixv1alpha1.Metric{
+				Promql: &coralogixv1alpha1.Promql{
 					SearchQuery: prometheusRule.Expr.StrVal,
-					Conditions: coralogixv1.PromqlConditions{
+					Conditions: coralogixv1alpha1.PromqlConditions{
 						TimeWindow:                 timeWindow,
-						AlertWhen:                  coralogixv1.AlertWhenMoreThan,
+						AlertWhen:                  coralogixv1alpha1.AlertWhenMoreThan,
 						Threshold:                  resource.MustParse("0"),
 						SampleThresholdPercentage:  100,
 						MinNonNullValuesPercentage: pointer.Int(0),
@@ -197,19 +196,19 @@ func prometheusInnerRuleToCoralogixAlert(prometheusRule prometheus.Rule) coralog
 	}
 }
 
-var prometheusAlertForToCoralogixPromqlAlertTimeWindow = map[prometheus.Duration]coralogixv1.MetricTimeWindow{
-	"1m":  coralogixv1.MetricTimeWindow(coralogixv1.TimeWindowMinute),
-	"5m":  coralogixv1.MetricTimeWindow(coralogixv1.TimeWindowFiveMinutes),
-	"10m": coralogixv1.MetricTimeWindow(coralogixv1.TimeWindowTenMinutes),
-	"15m": coralogixv1.MetricTimeWindow(coralogixv1.TimeWindowFifteenMinutes),
-	"20m": coralogixv1.MetricTimeWindow(coralogixv1.TimeWindowTwentyMinutes),
-	"30m": coralogixv1.MetricTimeWindow(coralogixv1.TimeWindowThirtyMinutes),
-	"1h":  coralogixv1.MetricTimeWindow(coralogixv1.TimeWindowHour),
-	"2h":  coralogixv1.MetricTimeWindow(coralogixv1.TimeWindowTwelveHours),
-	"4h":  coralogixv1.MetricTimeWindow(coralogixv1.TimeWindowFourHours),
-	"6h":  coralogixv1.MetricTimeWindow(coralogixv1.TimeWindowSixHours),
-	"12":  coralogixv1.MetricTimeWindow(coralogixv1.TimeWindowTwelveHours),
-	"24h": coralogixv1.MetricTimeWindow(coralogixv1.TimeWindowTwentyFourHours),
+var prometheusAlertForToCoralogixPromqlAlertTimeWindow = map[prometheus.Duration]coralogixv1alpha1.MetricTimeWindow{
+	"1m":  coralogixv1alpha1.MetricTimeWindow(coralogixv1alpha1.TimeWindowMinute),
+	"5m":  coralogixv1alpha1.MetricTimeWindow(coralogixv1alpha1.TimeWindowFiveMinutes),
+	"10m": coralogixv1alpha1.MetricTimeWindow(coralogixv1alpha1.TimeWindowTenMinutes),
+	"15m": coralogixv1alpha1.MetricTimeWindow(coralogixv1alpha1.TimeWindowFifteenMinutes),
+	"20m": coralogixv1alpha1.MetricTimeWindow(coralogixv1alpha1.TimeWindowTwentyMinutes),
+	"30m": coralogixv1alpha1.MetricTimeWindow(coralogixv1alpha1.TimeWindowThirtyMinutes),
+	"1h":  coralogixv1alpha1.MetricTimeWindow(coralogixv1alpha1.TimeWindowHour),
+	"2h":  coralogixv1alpha1.MetricTimeWindow(coralogixv1alpha1.TimeWindowTwelveHours),
+	"4h":  coralogixv1alpha1.MetricTimeWindow(coralogixv1alpha1.TimeWindowFourHours),
+	"6h":  coralogixv1alpha1.MetricTimeWindow(coralogixv1alpha1.TimeWindowSixHours),
+	"12":  coralogixv1alpha1.MetricTimeWindow(coralogixv1alpha1.TimeWindowTwelveHours),
+	"24h": coralogixv1alpha1.MetricTimeWindow(coralogixv1alpha1.TimeWindowTwentyFourHours),
 }
 
 func prometheusInnerRulesToCoralogixInnerRules(rules []prometheus.Rule) []coralogixv1alpha1.RecordingRule {

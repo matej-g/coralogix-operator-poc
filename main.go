@@ -120,7 +120,7 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "RuleGroup")
 		os.Exit(1)
 	}
-	if err = (&controllers.AlertReconciler{
+	if err = (&alphacontrollers.AlertReconciler{
 		CoralogixClientSet: clientset.NewClientSet(targetUrl, apiKey),
 		Client:             mgr.GetClient(),
 		Scheme:             mgr.GetScheme(),
@@ -138,8 +138,8 @@ func main() {
 	}
 	if err = (&alphacontrollers.RecordingRuleGroupSetReconciler{
 		CoralogixClientSet: clientset.NewClientSet(targetUrl, apiKey),
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:             mgr.GetClient(),
+		Scheme:             mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "RecordingRuleGroupSet")
 		os.Exit(1)

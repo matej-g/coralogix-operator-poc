@@ -15,7 +15,7 @@ spec:
     singular: alert
   scope: Namespaced
   versions:
-  - name: v1
+  - name: v1alpha1
     schema:
       openAPIV3Schema:
         description: Alert is the Schema for the alerts API
@@ -1619,9 +1619,6 @@ spec:
                     type: integer
                 type: object
               id:
-                description: 'INSERT ADDITIONAL STATUS FIELD - define observed state
-                  of cluster Important: Run "make" to regenerate code after modifying
-                  this file'
                 type: string
               labels:
                 additionalProperties:
