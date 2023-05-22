@@ -1,7 +1,8 @@
 # coralogix-operator-poc
+[![license](https://img.shields.io/github/license/coralogix/coralogix-operator-poc.svg)](https://raw.githubusercontent.com/coralogix/coralogix-operator-poc/main/LICENSE)
+![GitHub tag (latest SemVer pre-release)](https://img.shields.io/github/v/tag/coralogix/coralogix-operator-poc.svg?include_prereleases&style=plastic)
 ![Go Report Card](https://goreportcard.com/badge/github.com/coralogix/coralogix-operator-poc)
 ![e2e-tests](https://github.com/coralogix/coralogix-operator-poc/actions/workflows/e2e-tests.yaml/badge.svg?style=plastic)
-// TODO(user): Add simple overview of use/purpose
 
 ## Description
 // TODO(user): An in-depth paragraph about your project and overview of use
