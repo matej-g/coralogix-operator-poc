@@ -61,7 +61,7 @@ func (r *PrometheusRuleReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return ctrl.Result{RequeueAfter: defaultErrRequeuePeriod}, err
 	}
 
-	if createAndTrackRecordingRules(prometheusRuleCRD) {
+	if shouldTrackRecordingRules(prometheusRuleCRD) {
 		ruleGroupSetCRD := &coralogixv1.RecordingRuleGroupSet{}
 		if err := r.Client.Get(ctx, req.NamespacedName, ruleGroupSetCRD); err != nil {
 			if errors.IsNotFound(err) {
@@ -128,8 +128,8 @@ func (r *PrometheusRuleReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 }
 
-func createAndTrackRecordingRules(prometheusRule *prometheus.PrometheusRule) bool {
-	if toCreateStr, ok := prometheusRule.Labels["cxCreateAndTrackRecordingRule"]; ok && toCreateStr == "true" {
+func shouldTrackRecordingRules(prometheusRule *prometheus.PrometheusRule) bool {
+	if value, ok := prometheusRule.Labels["app.coralogix.com/track-recording-rules"]; ok && value == "true" {
 		return true
 	}
 	return false
@@ -166,7 +166,7 @@ func prometheusInnerRuleToCoralogixAlert(prometheusRule prometheus.Rule) coralog
 		duration, _ := time.ParseDuration(string(prometheusRule.For))
 		notificationPeriod = int(duration.Minutes())
 	}
-	
+
 	if notificationPeriod == 0 {
 		notificationPeriod = defaultCoralogixNotificationPeriod
 	}

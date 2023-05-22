@@ -5,8 +5,8 @@ metadata:
   labels:
     prometheus: example
     role: alert-rules
-    cxCreateAndTrackRecordingRule: "true"
-    cxCreateAndTrackAlerts: "true"
+    app.coralogix.com/track-recording-rules: "true"
+    app.coralogix.com/track-alerting-rules: "true"
   name: prometheus-example-rules
 spec:
   groups:
