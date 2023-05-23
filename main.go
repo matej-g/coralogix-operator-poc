@@ -112,7 +112,7 @@ func main() {
 	}
 
 	targetUrl := regionToGrpcUrl[region]
-	if err = (&controllers.RuleGroupReconciler{
+	if err = (&alphacontrollers.RuleGroupReconciler{
 		CoralogixClientSet: clientset.NewClientSet(targetUrl, apiKey),
 		Client:             mgr.GetClient(),
 		Scheme:             mgr.GetScheme(),
