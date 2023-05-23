@@ -14,14 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1
+package v1alpha1
 
 import (
 	"encoding/json"
 	"fmt"
 
-	utils "coralogix-operator-poc/api"
+	utils "coralogix-operator-poc/apis"
 	rulesgroups "coralogix-operator-poc/controllers/clientset/grpc/rules-groups/v1"
+
 	"google.golang.org/protobuf/types/known/wrapperspb"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -1075,6 +1076,7 @@ type RuleGroupStatus struct {
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
+//+kubebuilder:storageversion
 
 // RuleGroup is the Schema for the rulegroups API
 type RuleGroup struct {

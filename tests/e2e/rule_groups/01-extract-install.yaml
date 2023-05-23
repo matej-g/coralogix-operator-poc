@@ -1,4 +1,4 @@
-apiVersion: coralogix.coralogix/v1
+apiVersion: coralogix.coralogix/v1alpha1
 kind: RuleGroup
 metadata:
   labels:

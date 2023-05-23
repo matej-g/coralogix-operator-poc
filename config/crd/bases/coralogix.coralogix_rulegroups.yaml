@@ -15,7 +15,7 @@ spec:
     singular: rulegroup
   scope: Namespaced
   versions:
-  - name: v1
+  - name: v1alpha1
     schema:
       openAPIV3Schema:
         description: RuleGroup is the Schema for the rulegroups API

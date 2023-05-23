@@ -1,4 +1,4 @@
-apiVersion: coralogix.coralogix/v1
+apiVersion: coralogix.coralogix/v1alpha1
 kind: RuleGroup
 metadata:
   labels:
@@ -17,5 +17,5 @@ spec:
           parseJsonField:
             sourceField: text
             destinationField: text
-            keepSourceField:     true
+            keepSourceField: true
             keepDestinationField: false

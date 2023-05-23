@@ -15,15 +15,6 @@ resources:
   controller: true
   domain: coralogix
   group: coralogix
-  kind: RuleGroup
-  path: coralogix-operator-poc/api/v1
-  version: v1
-- api:
-    crdVersion: v1
-    namespaced: true
-  controller: true
-  domain: coralogix
-  group: coralogix
   kind: Alert
   path: coralogix-operator-poc/apis/coralogix/v1alpha1
   version: v1alpha1
@@ -43,6 +34,15 @@ resources:
   domain: coralogix
   group: coralogix
   kind: RecordingRuleGroupSet
+  path: coralogix-operator-poc/apis/coralogix/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: coralogix
+  group: coralogix
+  kind: RuleGroup
   path: coralogix-operator-poc/apis/coralogix/v1alpha1
   version: v1alpha1
 version: "3"

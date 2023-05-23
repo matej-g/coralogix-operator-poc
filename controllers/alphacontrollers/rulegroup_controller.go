@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controllers
+package alphacontrollers
 
 import (
 	"context"
@@ -22,6 +22,7 @@ import (
 
 	"coralogix-operator-poc/controllers/clientset"
 	rulesgroups "coralogix-operator-poc/controllers/clientset/grpc/rules-groups/v1"
+
 	"github.com/golang/protobuf/jsonpb"
 	"google.golang.org/grpc/codes"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -31,7 +32,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	coralogixv1 "coralogix-operator-poc/api/v1"
+	coralogixv1alpha1 "coralogix-operator-poc/apis/coralogix/v1alpha1"
+
 	"google.golang.org/grpc/status"
 )
 
@@ -63,7 +65,7 @@ func (r *RuleGroupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	rulesGroupsClient := r.CoralogixClientSet.RuleGroups()
 
 	//Get ruleGroupCRD
-	ruleGroupCRD := &coralogixv1.RuleGroup{}
+	ruleGroupCRD := &coralogixv1alpha1.RuleGroup{}
 
 	if err := r.Client.Get(ctx, req.NamespacedName, ruleGroupCRD); err != nil {
 		if errors.IsNotFound(err) {
@@ -124,7 +126,7 @@ func (r *RuleGroupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	var notFount bool
 	var err error
-	var actualState *coralogixv1.RuleGroupStatus
+	var actualState *coralogixv1alpha1.RuleGroupStatus
 	if id := ruleGroupCRD.Status.ID; id == nil {
 		log.V(1).Info("ruleGroup wasn't created")
 		notFount = true
@@ -171,8 +173,8 @@ func (r *RuleGroupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	return ctrl.Result{RequeueAfter: defaultRequeuePeriod}, nil
 }
 
-func flattenRuleGroup(ruleGroup *rulesgroups.RuleGroup) *coralogixv1.RuleGroupStatus {
-	var status coralogixv1.RuleGroupStatus
+func flattenRuleGroup(ruleGroup *rulesgroups.RuleGroup) *coralogixv1alpha1.RuleGroupStatus {
+	var status coralogixv1alpha1.RuleGroupStatus
 
 	status.ID = new(string)
 	*status.ID = ruleGroup.GetId().GetValue()
@@ -197,8 +199,8 @@ func flattenRuleGroup(ruleGroup *rulesgroups.RuleGroup) *coralogixv1.RuleGroupSt
 	return &status
 }
 
-func flattenRuleSubGroups(subgroups []*rulesgroups.RuleSubgroup) []coralogixv1.RuleSubGroup {
-	result := make([]coralogixv1.RuleSubGroup, 0, len(subgroups))
+func flattenRuleSubGroups(subgroups []*rulesgroups.RuleSubgroup) []coralogixv1alpha1.RuleSubGroup {
+	result := make([]coralogixv1alpha1.RuleSubGroup, 0, len(subgroups))
 	for _, sg := range subgroups {
 		subgroup := flattenRuleSubGroup(sg)
 		result = append(result, subgroup)
@@ -206,8 +208,8 @@ func flattenRuleSubGroups(subgroups []*rulesgroups.RuleSubgroup) []coralogixv1.R
 	return result
 }
 
-func flattenRuleSubGroup(subGroup *rulesgroups.RuleSubgroup) coralogixv1.RuleSubGroup {
-	var result coralogixv1.RuleSubGroup
+func flattenRuleSubGroup(subGroup *rulesgroups.RuleSubgroup) coralogixv1alpha1.RuleSubGroup {
+	var result coralogixv1alpha1.RuleSubGroup
 
 	result.ID = new(string)
 	*result.ID = subGroup.Id.GetValue()
@@ -222,8 +224,8 @@ func flattenRuleSubGroup(subGroup *rulesgroups.RuleSubgroup) coralogixv1.RuleSub
 	return result
 }
 
-func flattenRules(rules []*rulesgroups.Rule) []coralogixv1.Rule {
-	result := make([]coralogixv1.Rule, 0, len(rules))
+func flattenRules(rules []*rulesgroups.Rule) []coralogixv1alpha1.Rule {
+	result := make([]coralogixv1alpha1.Rule, 0, len(rules))
 	for _, r := range rules {
 		rule := flattenRule(r)
 		result = append(result, rule)
@@ -231,8 +233,8 @@ func flattenRules(rules []*rulesgroups.Rule) []coralogixv1.Rule {
 	return result
 }
 
-func flattenRule(rule *rulesgroups.Rule) coralogixv1.Rule {
-	var result coralogixv1.Rule
+func flattenRule(rule *rulesgroups.Rule) coralogixv1alpha1.Rule {
+	var result coralogixv1alpha1.Rule
 	result.Name = rule.GetName().GetValue()
 	result.Active = rule.GetEnabled().GetValue()
 	result.Description = rule.GetDescription().GetValue()
@@ -240,19 +242,19 @@ func flattenRule(rule *rulesgroups.Rule) coralogixv1.Rule {
 	switch ruleParams := rule.GetParameters().GetRuleParameters().(type) {
 	case *rulesgroups.RuleParameters_ExtractParameters:
 		extractParameters := ruleParams.ExtractParameters
-		result.Extract = &coralogixv1.Extract{
+		result.Extract = &coralogixv1alpha1.Extract{
 			Regex:       extractParameters.GetRule().GetValue(),
 			SourceField: rule.GetSourceField().GetValue(),
 		}
 	case *rulesgroups.RuleParameters_JsonExtractParameters:
 		jsonExtractParameters := ruleParams.JsonExtractParameters
-		result.JsonExtract = &coralogixv1.JsonExtract{
+		result.JsonExtract = &coralogixv1alpha1.JsonExtract{
 			JsonKey:          jsonExtractParameters.GetRule().GetValue(),
-			DestinationField: coralogixv1.RulesProtoSeverityDestinationFieldToSchemaDestinationField[jsonExtractParameters.GetDestinationField()],
+			DestinationField: coralogixv1alpha1.RulesProtoSeverityDestinationFieldToSchemaDestinationField[jsonExtractParameters.GetDestinationField()],
 		}
 	case *rulesgroups.RuleParameters_ReplaceParameters:
 		replaceParameters := ruleParams.ReplaceParameters
-		result.Replace = &coralogixv1.Replace{
+		result.Replace = &coralogixv1alpha1.Replace{
 			SourceField:       rule.GetSourceField().GetValue(),
 			DestinationField:  replaceParameters.GetDestinationField().GetValue(),
 			Regex:             replaceParameters.GetRule().GetValue(),
@@ -260,14 +262,14 @@ func flattenRule(rule *rulesgroups.Rule) coralogixv1.Rule {
 		}
 	case *rulesgroups.RuleParameters_ParseParameters:
 		parseParameters := ruleParams.ParseParameters
-		result.Parse = &coralogixv1.Parse{
+		result.Parse = &coralogixv1alpha1.Parse{
 			SourceField:      rule.GetSourceField().GetValue(),
 			DestinationField: parseParameters.GetDestinationField().GetValue(),
 			Regex:            parseParameters.GetRule().GetValue(),
 		}
 	case *rulesgroups.RuleParameters_AllowParameters:
 		allowParameters := ruleParams.AllowParameters
-		result.Block = &coralogixv1.Block{
+		result.Block = &coralogixv1alpha1.Block{
 			SourceField:               rule.GetSourceField().GetValue(),
 			Regex:                     allowParameters.GetRule().GetValue(),
 			KeepBlockedLogs:           allowParameters.GetKeepBlockedLogs().GetValue(),
@@ -275,7 +277,7 @@ func flattenRule(rule *rulesgroups.Rule) coralogixv1.Rule {
 		}
 	case *rulesgroups.RuleParameters_BlockParameters:
 		blockParameters := ruleParams.BlockParameters
-		result.Block = &coralogixv1.Block{
+		result.Block = &coralogixv1alpha1.Block{
 			SourceField:               rule.GetSourceField().GetValue(),
 			Regex:                     blockParameters.GetRule().GetValue(),
 			KeepBlockedLogs:           blockParameters.GetKeepBlockedLogs().GetValue(),
@@ -283,26 +285,26 @@ func flattenRule(rule *rulesgroups.Rule) coralogixv1.Rule {
 		}
 	case *rulesgroups.RuleParameters_ExtractTimestampParameters:
 		extractTimestampParameters := ruleParams.ExtractTimestampParameters
-		result.ExtractTimestamp = &coralogixv1.ExtractTimestamp{
+		result.ExtractTimestamp = &coralogixv1alpha1.ExtractTimestamp{
 			SourceField:         rule.GetSourceField().GetValue(),
 			TimeFormat:          extractTimestampParameters.GetFormat().GetValue(),
-			FieldFormatStandard: coralogixv1.RulesProtoFormatStandardToSchemaFormatStandard[extractTimestampParameters.GetStandard()],
+			FieldFormatStandard: coralogixv1alpha1.RulesProtoFormatStandardToSchemaFormatStandard[extractTimestampParameters.GetStandard()],
 		}
 	case *rulesgroups.RuleParameters_RemoveFieldsParameters:
 		removeFieldsParameters := ruleParams.RemoveFieldsParameters
-		result.RemoveFields = &coralogixv1.RemoveFields{
+		result.RemoveFields = &coralogixv1alpha1.RemoveFields{
 			ExcludedFields: removeFieldsParameters.GetFields(),
 		}
 	case *rulesgroups.RuleParameters_JsonStringifyParameters:
 		jsonStringifyParameters := ruleParams.JsonStringifyParameters
-		result.JsonStringify = &coralogixv1.JsonStringify{
+		result.JsonStringify = &coralogixv1alpha1.JsonStringify{
 			SourceField:      rule.GetSourceField().GetValue(),
 			DestinationField: jsonStringifyParameters.GetDestinationField().GetValue(),
 			KeepSourceField:  !(jsonStringifyParameters.GetDeleteSource().GetValue()),
 		}
 	case *rulesgroups.RuleParameters_JsonParseParameters:
 		jsonParseParameters := ruleParams.JsonParseParameters
-		result.ParseJsonField = &coralogixv1.ParseJsonField{
+		result.ParseJsonField = &coralogixv1alpha1.ParseJsonField{
 			SourceField:          rule.GetSourceField().GetValue(),
 			DestinationField:     jsonParseParameters.GetDestinationField().GetValue(),
 			KeepSourceField:      !(jsonParseParameters.GetDeleteSource().GetValue()),
@@ -314,7 +316,7 @@ func flattenRule(rule *rulesgroups.Rule) coralogixv1.Rule {
 	return result
 }
 
-func flattenRuleMatcher(ruleMatchers []*rulesgroups.RuleMatcher) (applications, subsystems []string, severities []coralogixv1.RuleSeverity) {
+func flattenRuleMatcher(ruleMatchers []*rulesgroups.RuleMatcher) (applications, subsystems []string, severities []coralogixv1alpha1.RuleSeverity) {
 	for _, ruleMatcher := range ruleMatchers {
 		switch matcher := ruleMatcher.Constraint.(type) {
 		case *rulesgroups.RuleMatcher_ApplicationName:
@@ -323,7 +325,7 @@ func flattenRuleMatcher(ruleMatchers []*rulesgroups.RuleMatcher) (applications, 
 			subsystems = append(subsystems, matcher.SubsystemName.GetValue().GetValue())
 		case *rulesgroups.RuleMatcher_Severity:
 			severity := matcher.Severity.GetValue()
-			severities = append(severities, coralogixv1.RulesProtoSeverityToSchemaSeverity[severity])
+			severities = append(severities, coralogixv1alpha1.RulesProtoSeverityToSchemaSeverity[severity])
 		default:
 			panic(fmt.Sprintf("unexpected type %T for rule matcher", ruleMatcher))
 		}
@@ -335,6 +337,6 @@ func flattenRuleMatcher(ruleMatchers []*rulesgroups.RuleMatcher) (applications, 
 // SetupWithManager sets up the controller with the Manager.
 func (r *RuleGroupReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&coralogixv1.RuleGroup{}).
+		For(&coralogixv1alpha1.RuleGroup{}).
 		Complete(r)
 }
