@@ -1,4 +1,4 @@
-apiVersion: coralogix.coralogix/v1
+apiVersion: coralogix.coralogix/v1alpha1
 kind: RuleGroup
 metadata:
   labels:
@@ -48,7 +48,7 @@ status:
           replace:
             destinationField: text
             regex: .*{
-            replacementString: '{'
+            replacementString: "{"
             sourceField: text
   subsystems:
     - subsystems-name

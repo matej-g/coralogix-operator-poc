@@ -23,7 +23,7 @@ import (
 
 	prometheus "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 
-	utils "coralogix-operator-poc/api"
+	utils "coralogix-operator-poc/apis"
 	"coralogix-operator-poc/controllers/clientset"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -37,7 +37,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	coralogixv1 "coralogix-operator-poc/api/v1"
 	coralogixv1alpha1 "coralogix-operator-poc/apis/coralogix/v1alpha1"
 	"coralogix-operator-poc/controllers"
 	"coralogix-operator-poc/controllers/alphacontrollers"
@@ -63,7 +62,6 @@ func init() {
 
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
-	utilruntime.Must(coralogixv1.AddToScheme(scheme))
 	utilruntime.Must(coralogixv1alpha1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }

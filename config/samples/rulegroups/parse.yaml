@@ -1,4 +1,4 @@
-apiVersion: coralogix.coralogix/v1
+apiVersion: coralogix.coralogix/v1alpha1
 kind: RuleGroup
 metadata:
   labels:
@@ -11,9 +11,9 @@ metadata:
 spec:
   name: parsing-rule
   description: rule-group from k8s operator
-  applications: [ "application-name" ]
-  subsystems: [ "subsystems-name" ]
-  severities: [ "Warning", "Info" ]
+  applications: ["application-name"]
+  subsystems: ["subsystems-name"]
+  severities: ["Warning", "Info"]
   subgroups:
     - rules:
         - name: HttpRequestParser2

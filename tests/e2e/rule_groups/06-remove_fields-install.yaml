@@ -1,4 +1,4 @@
-apiVersion: coralogix.coralogix/v1
+apiVersion: coralogix.coralogix/v1alpha1
 kind: RuleGroup
 metadata:
   labels:
@@ -15,4 +15,8 @@ spec:
     - rules:
         - name: Remove fields
           removeFields:
-            excludedFields:  ["coralogix.metadata.applicationName", "coralogix.metadata.className"]
+            excludedFields:
+              [
+                "coralogix.metadata.applicationName",
+                "coralogix.metadata.className",
+              ]

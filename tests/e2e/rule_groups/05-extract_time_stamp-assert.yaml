@@ -1,4 +1,4 @@
-apiVersion: coralogix.coralogix/v1
+apiVersion: coralogix.coralogix/v1alpha1
 kind: RuleGroup
 metadata:
   labels:
@@ -22,4 +22,4 @@ status:
           extractTimestamp:
             fieldFormatStandard: Strftime
             sourceField: text
-            timeFormat: '%Y-%m-%dT%H:%M:%S.%f%z'
+            timeFormat: "%Y-%m-%dT%H:%M:%S.%f%z"
