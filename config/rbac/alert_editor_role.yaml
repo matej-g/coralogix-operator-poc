@@ -11,21 +11,21 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: alert-editor-role
 rules:
-- apiGroups:
-  - coralogix.coralogix
-  resources:
-  - alerts
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - coralogix.coralogix
-  resources:
-  - alerts/status
-  verbs:
-  - get
+  - apiGroups:
+      - coralogix.com
+    resources:
+      - alerts
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - coralogix.com
+    resources:
+      - alerts/status
+    verbs:
+      - get

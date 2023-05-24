@@ -11,17 +11,17 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: recordingrulegroupset-viewer-role
 rules:
-- apiGroups:
-  - coralogix.coralogix
-  resources:
-  - recordingrulegroupsets
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - coralogix.coralogix
-  resources:
-  - recordingrulegroupsets/status
-  verbs:
-  - get
+  - apiGroups:
+      - coralogix.com
+    resources:
+      - recordingrulegroupsets
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - coralogix.com
+    resources:
+      - recordingrulegroupsets/status
+    verbs:
+      - get

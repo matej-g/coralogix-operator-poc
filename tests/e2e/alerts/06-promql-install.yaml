@@ -1,4 +1,4 @@
-apiVersion: coralogix.coralogix/v1alpha1
+apiVersion: coralogix.com/v1alpha1
 kind: Alert
 metadata:
   labels:
@@ -14,11 +14,11 @@ spec:
   severity: Critical
   notifications:
     recipients:
-      emails: [ "user@example.com" ]
-      webhooks: [ "WebhookAlerts" ]
+      emails: ["user@example.com"]
+      webhooks: ["WebhookAlerts"]
     notifyEveryMin: 720
   scheduling:
-    daysEnabled: [ "Wednesday", "Thursday" ]
+    daysEnabled: ["Wednesday", "Thursday"]
     timeZone: UTC+02
     startTime: 08:30
     endTime: 20:30

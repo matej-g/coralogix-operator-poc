@@ -11,17 +11,17 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: rulegroup-viewer-role
 rules:
-- apiGroups:
-  - coralogix.coralogix
-  resources:
-  - rulegroups
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - coralogix.coralogix
-  resources:
-  - rulegroups/status
-  verbs:
-  - get
+  - apiGroups:
+      - coralogix.com
+    resources:
+      - rulegroups
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - coralogix.com
+    resources:
+      - rulegroups/status
+    verbs:
+      - get

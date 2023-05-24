@@ -11,21 +11,21 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: recordingrulegroupset-editor-role
 rules:
-- apiGroups:
-  - coralogix.coralogix
-  resources:
-  - recordingrulegroupsets
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - coralogix.coralogix
-  resources:
-  - recordingrulegroupsets/status
-  verbs:
-  - get
+  - apiGroups:
+      - coralogix.com
+    resources:
+      - recordingrulegroupsets
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - coralogix.com
+    resources:
+      - recordingrulegroupsets/status
+    verbs:
+      - get

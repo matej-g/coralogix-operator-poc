@@ -2,47 +2,43 @@
 # This file is used to track the info used to scaffold your project
 # and allow the plugins properly work.
 # More info: https://book.kubebuilder.io/reference/project-config.html
-domain: coralogix
+domain: coralogix.com
 layout:
-- go.kubebuilder.io/v3
+  - go.kubebuilder.io/v3
 multigroup: true
 projectName: coralogix-operator-poc
 repo: coralogix-operator-poc
 resources:
-- api:
-    crdVersion: v1
-    namespaced: true
-  controller: true
-  domain: coralogix
-  group: coralogix
-  kind: Alert
-  path: coralogix-operator-poc/apis/coralogix/v1alpha1
-  version: v1alpha1
-- api:
-    crdVersion: v1
-    namespaced: true
-  controller: true
-  domain: coralogix
-  group: coralogix
-  kind: RecordingRuleGroup
-  path: coralogix-operator-poc/api/v1
-  version: v1
-- api:
-    crdVersion: v1
-    namespaced: true
-  controller: true
-  domain: coralogix
-  group: coralogix
-  kind: RecordingRuleGroupSet
-  path: coralogix-operator-poc/apis/coralogix/v1alpha1
-  version: v1alpha1
-- api:
-    crdVersion: v1
-    namespaced: true
-  controller: true
-  domain: coralogix
-  group: coralogix
-  kind: RuleGroup
-  path: coralogix-operator-poc/apis/coralogix/v1alpha1
-  version: v1alpha1
+  - api:
+      crdVersion: v1
+      namespaced: true
+    controller: true
+    domain: coralogix.com
+    kind: Alert
+    path: coralogix-operator-poc/apis/coralogix/v1alpha1
+    version: v1alpha1
+  - api:
+      crdVersion: v1
+      namespaced: true
+    controller: true
+    domain: coralogix.com
+    kind: RecordingRuleGroup
+    path: coralogix-operator-poc/api/v1
+    version: v1
+  - api:
+      crdVersion: v1
+      namespaced: true
+    controller: true
+    domain: coralogix.com
+    kind: RecordingRuleGroupSet
+    path: coralogix-operator-poc/apis/coralogix/v1alpha1
+    version: v1alpha1
+  - api:
+      crdVersion: v1
+      namespaced: true
+    controller: true
+    domain: coralogix.com
+    kind: RuleGroup
+    path: coralogix-operator-poc/apis/coralogix/v1alpha1
+    version: v1alpha1
 version: "3"

@@ -1,4 +1,4 @@
-apiVersion: coralogix.coralogix/v1alpha1
+apiVersion: coralogix.com/v1alpha1
 kind: Alert
 metadata:
   labels:
@@ -61,4 +61,3 @@ metadata:
       startTime: "08:30"
       timeZone: UTC+02
     severity: Critical
-

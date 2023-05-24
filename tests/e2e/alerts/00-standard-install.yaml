@@ -1,4 +1,4 @@
-apiVersion: coralogix.coralogix/v1alpha1
+apiVersion: coralogix.com/v1alpha1
 kind: Alert
 metadata:
   labels:
@@ -17,11 +17,11 @@ spec:
     security_severity: high
   notifications:
     recipients:
-      emails: [ "user@example.com" ]
-      webhooks: [ "WebhookAlerts" ]
+      emails: ["user@example.com"]
+      webhooks: ["WebhookAlerts"]
     notifyEveryMin: 10
   scheduling:
-    daysEnabled: [ "Wednesday", "Thursday" ]
+    daysEnabled: ["Wednesday", "Thursday"]
     timeZone: UTC+02
     startTime: 08:00
     endTime: 20:00
@@ -29,11 +29,11 @@ spec:
     standard:
       filters:
         searchQuery: remote_addr_enriched:/.*/
-        applications: [ "filter:contains:nginx" ]
-        subsystems: [ "filter:startsWith:subsystem-name" ]
-        severities: [ "Warning", "Info" ]
+        applications: ["filter:contains:nginx"]
+        subsystems: ["filter:startsWith:subsystem-name"]
+        severities: ["Warning", "Info"]
       conditions:
         alertWhen: More
         threshold: 5
         timeWindow: FiveMinutes
-        groupBy: [ "coralogix.metadata.sdkId" ]
+        groupBy: ["coralogix.metadata.sdkId"]
