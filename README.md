@@ -1,11 +1,23 @@
-# coralogix-operator-poc
+# Coralogix Operator
 [![license](https://img.shields.io/github/license/coralogix/coralogix-operator-poc.svg)](https://raw.githubusercontent.com/coralogix/coralogix-operator-poc/main/LICENSE)
 ![GitHub tag (latest SemVer pre-release)](https://img.shields.io/github/v/tag/coralogix/coralogix-operator-poc.svg?include_prereleases&style=plastic)
 ![Go Report Card](https://goreportcard.com/badge/github.com/coralogix/coralogix-operator-poc)
 ![e2e-tests](https://github.com/coralogix/coralogix-operator-poc/actions/workflows/e2e-tests.yaml/badge.svg?style=plastic)
 
-## Description
-// TODO(user): An in-depth paragraph about your project and overview of use
+## Overview
+The Coralogix Operator provides Kubernetes native deployment and management of Coralogix and related components. The purpose of this project is to simplify and automate the configuration of a Coralogix APIs for Kubernetes clusters.
+
+The Coralogix operator includes, but is not limited to, the following features:
+
+Kubernetes Custom Resources: Use Kubernetes custom resources to deploy and manage 
+[Alerts](https://github.com/coralogix/coralogix-operator-poc/tree/main/config/samples/alerts), 
+[RecordingRuleGroupSets](https://github.com/coralogix/coralogix-operator-poc/tree/main/config/samples/recordingrulegroupset),
+[RuleGroups](https://github.com/coralogix/coralogix-operator-poc/tree/main/config/samples/rulegroups) and related components.
+
+# Guides
+
+- [Contributing](CONTRIBUTING.md)
+
 
 ## Getting Started
 You’ll need a Kubernetes cluster to run against. You can use [KIND](https://sigs.k8s.io/kind) to get a local cluster for testing, or run against a remote cluster.
