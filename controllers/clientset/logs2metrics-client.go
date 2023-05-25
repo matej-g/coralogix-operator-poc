@@ -3,7 +3,7 @@ package clientset
 import (
 	"context"
 
-	logs2metrics "coralogix-operator-poc/controllers/clientset/grpc/logs2metrics/v2"
+	logs2metrics "github.com/coralogix/coralogix-operator-poc/controllers/clientset/grpc/logs2metrics/v2"
 
 	"google.golang.org/protobuf/types/known/emptypb"
 )

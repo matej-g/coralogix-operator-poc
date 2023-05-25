@@ -3,7 +3,7 @@ package clientset
 import (
 	"context"
 
-	rulesgroups "coralogix-operator-poc/controllers/clientset/grpc/rules-groups/v1"
+	rulesgroups "github.com/coralogix/coralogix-operator-poc/controllers/clientset/grpc/rules-groups/v1"
 )
 
 type RuleGroupsClient struct {

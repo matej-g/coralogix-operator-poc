@@ -24,9 +24,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	coralogixv1alpha1 "coralogix-operator-poc/apis/coralogix/v1alpha1"
-	"coralogix-operator-poc/controllers/clientset"
-	rrg "coralogix-operator-poc/controllers/clientset/grpc/recording-rules-groups/v2"
+	coralogixv1alpha1 "github.com/coralogix/coralogix-operator-poc/apis/coralogix/v1alpha1"
+	"github.com/coralogix/coralogix-operator-poc/controllers/clientset"
+	rrg "github.com/coralogix/coralogix-operator-poc/controllers/clientset/grpc/recording-rules-groups/v2"
 
 	"github.com/golang/protobuf/jsonpb"
 	"google.golang.org/grpc/codes"

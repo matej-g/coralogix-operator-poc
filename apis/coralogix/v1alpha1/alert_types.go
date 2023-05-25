@@ -23,8 +23,8 @@ import (
 	"strings"
 	"time"
 
-	utils "coralogix-operator-poc/apis"
-	alerts "coralogix-operator-poc/controllers/clientset/grpc/alerts/v1"
+	utils "github.com/coralogix/coralogix-operator-poc/apis"
+	alerts "github.com/coralogix/coralogix-operator-poc/controllers/clientset/grpc/alerts/v1"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

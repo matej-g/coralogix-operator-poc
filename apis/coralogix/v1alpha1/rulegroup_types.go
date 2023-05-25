@@ -20,8 +20,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	utils "coralogix-operator-poc/apis"
-	rulesgroups "coralogix-operator-poc/controllers/clientset/grpc/rules-groups/v1"
+	utils "github.com/coralogix/coralogix-operator-poc/apis"
+	rulesgroups "github.com/coralogix/coralogix-operator-poc/controllers/clientset/grpc/rules-groups/v1"
 
 	"google.golang.org/protobuf/types/known/wrapperspb"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

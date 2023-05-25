@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"coralogix-operator-poc/controllers/clientset/rest"
+	"github.com/coralogix/coralogix-operator-poc/controllers/clientset/rest"
 
 	gapi "github.com/grafana/grafana-api-golang-client"
 )

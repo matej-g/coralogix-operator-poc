@@ -20,8 +20,8 @@ import (
 	"context"
 	"fmt"
 
-	"coralogix-operator-poc/controllers/clientset"
-	rulesgroups "coralogix-operator-poc/controllers/clientset/grpc/rules-groups/v1"
+	"github.com/coralogix/coralogix-operator-poc/controllers/clientset"
+	rulesgroups "github.com/coralogix/coralogix-operator-poc/controllers/clientset/grpc/rules-groups/v1"
 
 	"github.com/golang/protobuf/jsonpb"
 	"google.golang.org/grpc/codes"
@@ -32,7 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	coralogixv1alpha1 "coralogix-operator-poc/apis/coralogix/v1alpha1"
+	coralogixv1alpha1 "github.com/coralogix/coralogix-operator-poc/apis/coralogix/v1alpha1"
 
 	"google.golang.org/grpc/status"
 )

@@ -3,7 +3,7 @@ package clientset
 import (
 	"context"
 
-	actions "coralogix-operator-poc/controllers/clientset/grpc/actions/v2"
+	actions "github.com/coralogix/coralogix-operator-poc/controllers/clientset/grpc/actions/v2"
 )
 
 type ActionsClient struct {

@@ -1,4 +1,4 @@
-module coralogix-operator-poc
+module github.com/coralogix/coralogix-operator-poc
 
 go 1.20
 

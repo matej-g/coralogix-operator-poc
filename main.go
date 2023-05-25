@@ -23,8 +23,8 @@ import (
 
 	prometheus "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 
-	utils "coralogix-operator-poc/apis"
-	"coralogix-operator-poc/controllers/clientset"
+	utils "github.com/coralogix/coralogix-operator-poc/apis"
+	"github.com/coralogix/coralogix-operator-poc/controllers/clientset"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -37,9 +37,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	coralogixv1alpha1 "coralogix-operator-poc/apis/coralogix/v1alpha1"
-	"coralogix-operator-poc/controllers"
-	"coralogix-operator-poc/controllers/alphacontrollers"
+	coralogixv1alpha1 "github.com/coralogix/coralogix-operator-poc/apis/coralogix/v1alpha1"
+	"github.com/coralogix/coralogix-operator-poc/controllers"
+	"github.com/coralogix/coralogix-operator-poc/controllers/alphacontrollers"
 	//+kubebuilder:scaffold:imports
 )
 

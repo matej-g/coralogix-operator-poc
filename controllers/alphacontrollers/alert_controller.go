@@ -32,10 +32,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	utils "coralogix-operator-poc/apis"
-	coralogixv1alpha1 "coralogix-operator-poc/apis/coralogix/v1alpha1"
-	"coralogix-operator-poc/controllers/clientset"
-	alerts "coralogix-operator-poc/controllers/clientset/grpc/alerts/v1"
+	utils "github.com/coralogix/coralogix-operator-poc/apis"
+	coralogixv1alpha1 "github.com/coralogix/coralogix-operator-poc/apis/coralogix/v1alpha1"
+	"github.com/coralogix/coralogix-operator-poc/controllers/clientset"
+	alerts "github.com/coralogix/coralogix-operator-poc/controllers/clientset/grpc/alerts/v1"
 )
 
 var (

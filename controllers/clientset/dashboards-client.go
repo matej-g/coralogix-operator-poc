@@ -3,7 +3,7 @@ package clientset
 import (
 	"context"
 
-	dashboards "coralogix-operator-poc/controllers/clientset/grpc/coralogix-dashboards/v1"
+	dashboards "github.com/coralogix/coralogix-operator-poc/controllers/clientset/grpc/coralogix-dashboards/v1"
 )
 
 type DashboardsClient struct {

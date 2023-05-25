@@ -3,7 +3,7 @@ package clientset
 import (
 	"context"
 
-	enrichment "coralogix-operator-poc/controllers/clientset/grpc/enrichment/v1"
+	enrichment "github.com/coralogix/coralogix-operator-poc/controllers/clientset/grpc/enrichment/v1"
 
 	"google.golang.org/protobuf/types/known/wrapperspb"
 )

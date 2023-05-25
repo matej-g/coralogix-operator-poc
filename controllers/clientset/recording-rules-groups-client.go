@@ -3,7 +3,7 @@ package clientset
 import (
 	"context"
 
-	rrg "coralogix-operator-poc/controllers/clientset/grpc/recording-rules-groups/v2"
+	rrg "github.com/coralogix/coralogix-operator-poc/controllers/clientset/grpc/recording-rules-groups/v2"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 

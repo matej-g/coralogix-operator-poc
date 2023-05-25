@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"time"
 
-	coralogixv1alpha1 "coralogix-operator-poc/apis/coralogix/v1alpha1"
-	"coralogix-operator-poc/controllers/clientset"
+	coralogixv1alpha1 "github.com/coralogix/coralogix-operator-poc/apis/coralogix/v1alpha1"
+	"github.com/coralogix/coralogix-operator-poc/controllers/clientset"
 
 	prometheus "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
