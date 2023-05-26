@@ -5,9 +5,9 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.9.2
   creationTimestamp: null
-  name: rulegroups.coralogix.com
+  name: rulegroups.coralogix.coralogix
 spec:
-  group: coralogix.com
+  group: coralogix.coralogix
   names:
     kind: RuleGroup
     listKind: RuleGroupList

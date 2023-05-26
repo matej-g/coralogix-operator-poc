@@ -12,7 +12,7 @@ metadata:
   name: alert-editor-role
 rules:
   - apiGroups:
-      - coralogix.com
+      - coralogix.coralogix
     resources:
       - alerts
     verbs:
@@ -24,7 +24,7 @@ rules:
       - update
       - watch
   - apiGroups:
-      - coralogix.com
+      - coralogix.coralogix
     resources:
       - alerts/status
     verbs:

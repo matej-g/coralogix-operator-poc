@@ -2,7 +2,7 @@
 # This file is used to track the info used to scaffold your project
 # and allow the plugins properly work.
 # More info: https://book.kubebuilder.io/reference/project-config.html
-domain: coralogix.com
+domain: coralogix.coralogix
 layout:
   - go.kubebuilder.io/v3
 multigroup: true
@@ -13,7 +13,7 @@ resources:
       crdVersion: v1
       namespaced: true
     controller: true
-    domain: coralogix.com
+    domain: coralogix.coralogix
     kind: Alert
     path: coralogix-operator-poc/apis/coralogix/v1alpha1
     version: v1alpha1
@@ -21,7 +21,7 @@ resources:
       crdVersion: v1
       namespaced: true
     controller: true
-    domain: coralogix.com
+    domain: coralogix.coralogix
     kind: RecordingRuleGroup
     path: coralogix-operator-poc/api/v1
     version: v1
@@ -29,7 +29,7 @@ resources:
       crdVersion: v1
       namespaced: true
     controller: true
-    domain: coralogix.com
+    domain: coralogix.coralogix
     kind: RecordingRuleGroupSet
     path: coralogix-operator-poc/apis/coralogix/v1alpha1
     version: v1alpha1
@@ -37,7 +37,7 @@ resources:
       crdVersion: v1
       namespaced: true
     controller: true
-    domain: coralogix.com
+    domain: coralogix.coralogix
     kind: RuleGroup
     path: coralogix-operator-poc/apis/coralogix/v1alpha1
     version: v1alpha1

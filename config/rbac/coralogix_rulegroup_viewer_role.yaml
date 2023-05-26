@@ -12,7 +12,7 @@ metadata:
   name: rulegroup-viewer-role
 rules:
   - apiGroups:
-      - coralogix.com
+      - coralogix.coralogix
     resources:
       - rulegroups
     verbs:
@@ -20,7 +20,7 @@ rules:
       - list
       - watch
   - apiGroups:
-      - coralogix.com
+      - coralogix.coralogix
     resources:
       - rulegroups/status
     verbs:
