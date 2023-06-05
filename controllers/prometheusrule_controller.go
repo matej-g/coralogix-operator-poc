@@ -12,6 +12,7 @@ import (
 	prometheus "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/pointer"
@@ -73,6 +74,14 @@ func (r *PrometheusRuleReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 				}
 				ruleGroupSetCRD.Namespace = req.Namespace
 				ruleGroupSetCRD.Name = req.Name
+				ruleGroupSetCRD.OwnerReferences = []metav1.OwnerReference{
+					{
+						APIVersion: prometheusRuleCRD.APIVersion,
+						Kind:       prometheusRuleCRD.Kind,
+						Name:       prometheusRuleCRD.Name,
+						UID:        prometheusRuleCRD.UID,
+					},
+				}
 				if err = r.Create(ctx, ruleGroupSetCRD); err != nil {
 					log.Error(err, "Received an error while trying to create RecordingRuleGroupSet CRD", "RecordingRuleGroupSet Name", ruleGroupSetCRD.Name)
 					return ctrl.Result{RequeueAfter: defaultErrRequeuePeriod}, err
@@ -88,6 +97,14 @@ func (r *PrometheusRuleReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		if ruleGroupSetCRD.Spec, err = prometheusRuleToRuleGroupSet(prometheusRuleCRD); err != nil {
 			log.Error(err, "Received an error while Converting PrometheusRule to RecordingRuleGroupSet", "PrometheusRule Name", prometheusRuleCRD.Name)
 			return ctrl.Result{RequeueAfter: defaultErrRequeuePeriod}, err
+		}
+		ruleGroupSetCRD.OwnerReferences = []metav1.OwnerReference{
+			{
+				APIVersion: prometheusRuleCRD.APIVersion,
+				Kind:       prometheusRuleCRD.Kind,
+				Name:       prometheusRuleCRD.Name,
+				UID:        prometheusRuleCRD.UID,
+			},
 		}
 
 		if err = r.Client.Update(ctx, ruleGroupSetCRD); err != nil {
