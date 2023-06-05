@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	coralogixv1alpha1 "github.com/coralogix/coralogix-operator-poc/apis/coralogix/v1alpha1"
@@ -17,6 +18,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/pointer"
 	ctrl "sigs.k8s.io/controller-runtime"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -112,17 +114,65 @@ func (r *PrometheusRuleReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		}
 	}
 
-	for _, group := range prometheusRuleCRD.Spec.Groups {
-		for _, rule := range group.Rules {
-			if alertName := rule.Annotations["cxAlertName"]; rule.Alert != "" && alertName != "" {
+	if shouldTrackAlerts(prometheusRuleCRD) {
+		// A single PrometheusRule can have multiple alerts with the same name, while the Alert CRD from coralogix can only manage one alert.
+		// alertMap is used to map an alert name with potentially multiple alerts from the promrule CRD. For example:
+		//
+		// A prometheusRule with the following rules:
+		// rules:
+		//   - alert: Example
+		//     expr: metric > 10
+		//   - alert: Example
+	    //     expr: metric > 20
+		//
+		// Would be mapped into:
+		//   map[string][]prometheus.Rule{
+		// 	   "Example": []prometheus.Rule{
+		// 		 {
+		//          Alert: Example,
+		//          Expr: "metric > 10"
+		// 		 },
+		// 		 {
+		//          Alert: Example,
+		//          Expr: "metric > 100"
+		// 		 },
+		// 	   },
+		//   }
+		//
+		// To later on generate coralogix Alert CRDs using the alert name followed by it's index on the array, making sure we don't clash names.
+		alertMap := make(map[string][]prometheus.Rule)
+		var a string
+		for _, group := range prometheusRuleCRD.Spec.Groups {
+			for _, rule := range group.Rules {
+				if rule.Alert != "" {
+					a = strings.ToLower(rule.Alert)
+					if _, ok := alertMap[a]; !ok {
+						alertMap[a] = []prometheus.Rule{rule} 
+						continue
+					}
+					alertMap[a] = append(alertMap[a], rule)
+				}	
+			}
+		}
+
+		for alertName, rules := range alertMap {
+			for i, rule := range rules {
 				alertCRD := &coralogixv1alpha1.Alert{}
-				req.Name = alertName
+				req.Name = fmt.Sprintf("%s-%d", alertName, i)
 				if err := r.Client.Get(ctx, req.NamespacedName, alertCRD); err != nil {
 					if errors.IsNotFound(err) {
 						log.V(1).Info(fmt.Sprintf("Couldn't find Alert Namespace: %s, Name: %s. Trying to create.", req.Namespace, req.Name))
 						alertCRD.Spec = prometheusInnerRuleToCoralogixAlert(rule)
 						alertCRD.Namespace = req.Namespace
-						alertCRD.Name = alertName
+						alertCRD.Name = fmt.Sprintf("%s-%d", alertName, i)
+						alertCRD.OwnerReferences = []metav1.OwnerReference{
+							{
+								APIVersion: prometheusRuleCRD.APIVersion,
+								Kind:       prometheusRuleCRD.Kind,
+								Name:       prometheusRuleCRD.Name,
+								UID:        prometheusRuleCRD.UID,
+							},
+						}
 						if err = r.Create(ctx, alertCRD); err != nil {
 							log.Error(err, "Received an error while trying to create Alert CRD", "Alert Name", alertCRD.Name)
 							return ctrl.Result{RequeueAfter: defaultErrRequeuePeriod}, err
@@ -134,6 +184,14 @@ func (r *PrometheusRuleReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 				//Converting the PrometheusRule to the desired Alert.
 				alertCRD.Spec = prometheusInnerRuleToCoralogixAlert(rule)
+				alertCRD.OwnerReferences = []metav1.OwnerReference{
+					{
+						APIVersion: prometheusRuleCRD.APIVersion,
+						Kind:       prometheusRuleCRD.Kind,
+						Name:       prometheusRuleCRD.Name,
+						UID:        prometheusRuleCRD.UID,
+					},
+				}
 				if err := r.Client.Update(ctx, alertCRD); err != nil {
 					return ctrl.Result{RequeueAfter: defaultErrRequeuePeriod}, err
 				}
@@ -142,11 +200,17 @@ func (r *PrometheusRuleReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}
 
 	return ctrl.Result{RequeueAfter: defaultRequeuePeriod}, nil
-
 }
 
 func shouldTrackRecordingRules(prometheusRule *prometheus.PrometheusRule) bool {
 	if value, ok := prometheusRule.Labels["app.coralogix.com/track-recording-rules"]; ok && value == "true" {
+		return true
+	}
+	return false
+}
+
+func shouldTrackAlerts(prometheusRule *prometheus.PrometheusRule) bool {
+	if value, ok := prometheusRule.Labels["app.coralogix.com/track-alerting-rules"]; ok && value == "true" {
 		return true
 	}
 	return false
