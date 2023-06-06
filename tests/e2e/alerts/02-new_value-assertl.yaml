@@ -21,15 +21,22 @@ status:
           - Error
   description: alert from k8s operator
   name: new-value alert example
-  notifications:
-    notifyEveryMin: 10
-    notifyOnlyOnTriggeredGroupByValues: false
-    onTriggerAndResolved: false
-    recipients:
-      emails:
-        - user@example.com
-      webhooks:
-        - WebhookAlerts
+  notificationGroups:
+    - notifications:
+        - notifyOn: TriggeredOnly
+          integrationID: 2235
+          retriggeringPeriodMinutes: 1
+        - notifyOn: TriggeredAndResolved
+          emailRecipients: [ "example@coralogix.com" ]
+          retriggeringPeriodMinutes: 1440
+    - groupByFields: [ "coralogix.metadata.sdkId" ]
+      notifications:
+        - notifyOn: TriggeredOnly
+          integrationID: 2235
+          retriggeringPeriodMinutes: 1
+        - notifyOn: TriggeredAndResolved
+          emailRecipients: [ "example2@coralogix.com" ]
+          retriggeringPeriodMinutes: 1440
   scheduling:
     daysEnabled:
       - Wednesday

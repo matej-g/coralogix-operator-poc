@@ -7,12 +7,11 @@
 package __
 
 import (
-	reflect "reflect"
-	sync "sync"
-
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	wrapperspb "google.golang.org/protobuf/types/known/wrapperspb"
+	reflect "reflect"
+	sync "sync"
 )
 
 const (
@@ -184,7 +183,7 @@ func (x *AlertFilters) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use Filters.ProtoReflect.Descriptor instead.
+// Deprecated: Use AlertFilters.ProtoReflect.Descriptor instead.
 func (*AlertFilters) Descriptor() ([]byte, []int) {
 	return file_com_coralogix_alerts_v1_alert_filters_proto_rawDescGZIP(), []int{0}
 }
@@ -547,33 +546,33 @@ func file_com_coralogix_alerts_v1_alert_filters_proto_rawDescGZIP() []byte {
 var file_com_coralogix_alerts_v1_alert_filters_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
 var file_com_coralogix_alerts_v1_alert_filters_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
 var file_com_coralogix_alerts_v1_alert_filters_proto_goTypes = []interface{}{
-	(AlertFilters_LogSeverity)(0),        // 0: com.coralogix.alerts.v1.Filters.LogSeverity
-	(AlertFilters_FilterType)(0),         // 1: com.coralogix.alerts.v1.Filters.FilterType
-	(*AlertFilters)(nil),                 // 2: com.coralogix.alerts.v1.Filters
-	(*AlertFilters_MetadataFilters)(nil), // 3: com.coralogix.alerts.v1.Filters.MetadataFilters
-	(*AlertFilters_RatioAlert)(nil),      // 4: com.coralogix.alerts.v1.Filters.RatioAlert
+	(AlertFilters_LogSeverity)(0),        // 0: com.coralogix.alerts.v1.AlertFilters.LogSeverity
+	(AlertFilters_FilterType)(0),         // 1: com.coralogix.alerts.v1.AlertFilters.FilterType
+	(*AlertFilters)(nil),                 // 2: com.coralogix.alerts.v1.AlertFilters
+	(*AlertFilters_MetadataFilters)(nil), // 3: com.coralogix.alerts.v1.AlertFilters.MetadataFilters
+	(*AlertFilters_RatioAlert)(nil),      // 4: com.coralogix.alerts.v1.AlertFilters.RatioAlert
 	(*wrapperspb.StringValue)(nil),       // 5: google.protobuf.StringValue
 }
 var file_com_coralogix_alerts_v1_alert_filters_proto_depIdxs = []int32{
-	0,  // 0: com.coralogix.alerts.v1.Filters.severities:type_name -> com.coralogix.alerts.v1.Filters.LogSeverity
-	3,  // 1: com.coralogix.alerts.v1.Filters.metadata:type_name -> com.coralogix.alerts.v1.Filters.MetadataFilters
-	5,  // 2: com.coralogix.alerts.v1.Filters.alias:type_name -> google.protobuf.StringValue
-	5,  // 3: com.coralogix.alerts.v1.Filters.text:type_name -> google.protobuf.StringValue
-	4,  // 4: com.coralogix.alerts.v1.Filters.ratio_alerts:type_name -> com.coralogix.alerts.v1.Filters.RatioAlert
-	1,  // 5: com.coralogix.alerts.v1.Filters.filter_type:type_name -> com.coralogix.alerts.v1.Filters.FilterType
-	5,  // 6: com.coralogix.alerts.v1.Filters.MetadataFilters.categories:type_name -> google.protobuf.StringValue
-	5,  // 7: com.coralogix.alerts.v1.Filters.MetadataFilters.applications:type_name -> google.protobuf.StringValue
-	5,  // 8: com.coralogix.alerts.v1.Filters.MetadataFilters.subsystems:type_name -> google.protobuf.StringValue
-	5,  // 9: com.coralogix.alerts.v1.Filters.MetadataFilters.computers:type_name -> google.protobuf.StringValue
-	5,  // 10: com.coralogix.alerts.v1.Filters.MetadataFilters.classes:type_name -> google.protobuf.StringValue
-	5,  // 11: com.coralogix.alerts.v1.Filters.MetadataFilters.methods:type_name -> google.protobuf.StringValue
-	5,  // 12: com.coralogix.alerts.v1.Filters.MetadataFilters.ip_addresses:type_name -> google.protobuf.StringValue
-	5,  // 13: com.coralogix.alerts.v1.Filters.RatioAlert.alias:type_name -> google.protobuf.StringValue
-	5,  // 14: com.coralogix.alerts.v1.Filters.RatioAlert.text:type_name -> google.protobuf.StringValue
-	0,  // 15: com.coralogix.alerts.v1.Filters.RatioAlert.severities:type_name -> com.coralogix.alerts.v1.Filters.LogSeverity
-	5,  // 16: com.coralogix.alerts.v1.Filters.RatioAlert.applications:type_name -> google.protobuf.StringValue
-	5,  // 17: com.coralogix.alerts.v1.Filters.RatioAlert.subsystems:type_name -> google.protobuf.StringValue
-	5,  // 18: com.coralogix.alerts.v1.Filters.RatioAlert.group_by:type_name -> google.protobuf.StringValue
+	0,  // 0: com.coralogix.alerts.v1.AlertFilters.severities:type_name -> com.coralogix.alerts.v1.AlertFilters.LogSeverity
+	3,  // 1: com.coralogix.alerts.v1.AlertFilters.metadata:type_name -> com.coralogix.alerts.v1.AlertFilters.MetadataFilters
+	5,  // 2: com.coralogix.alerts.v1.AlertFilters.alias:type_name -> google.protobuf.StringValue
+	5,  // 3: com.coralogix.alerts.v1.AlertFilters.text:type_name -> google.protobuf.StringValue
+	4,  // 4: com.coralogix.alerts.v1.AlertFilters.ratio_alerts:type_name -> com.coralogix.alerts.v1.AlertFilters.RatioAlert
+	1,  // 5: com.coralogix.alerts.v1.AlertFilters.filter_type:type_name -> com.coralogix.alerts.v1.AlertFilters.FilterType
+	5,  // 6: com.coralogix.alerts.v1.AlertFilters.MetadataFilters.categories:type_name -> google.protobuf.StringValue
+	5,  // 7: com.coralogix.alerts.v1.AlertFilters.MetadataFilters.applications:type_name -> google.protobuf.StringValue
+	5,  // 8: com.coralogix.alerts.v1.AlertFilters.MetadataFilters.subsystems:type_name -> google.protobuf.StringValue
+	5,  // 9: com.coralogix.alerts.v1.AlertFilters.MetadataFilters.computers:type_name -> google.protobuf.StringValue
+	5,  // 10: com.coralogix.alerts.v1.AlertFilters.MetadataFilters.classes:type_name -> google.protobuf.StringValue
+	5,  // 11: com.coralogix.alerts.v1.AlertFilters.MetadataFilters.methods:type_name -> google.protobuf.StringValue
+	5,  // 12: com.coralogix.alerts.v1.AlertFilters.MetadataFilters.ip_addresses:type_name -> google.protobuf.StringValue
+	5,  // 13: com.coralogix.alerts.v1.AlertFilters.RatioAlert.alias:type_name -> google.protobuf.StringValue
+	5,  // 14: com.coralogix.alerts.v1.AlertFilters.RatioAlert.text:type_name -> google.protobuf.StringValue
+	0,  // 15: com.coralogix.alerts.v1.AlertFilters.RatioAlert.severities:type_name -> com.coralogix.alerts.v1.AlertFilters.LogSeverity
+	5,  // 16: com.coralogix.alerts.v1.AlertFilters.RatioAlert.applications:type_name -> google.protobuf.StringValue
+	5,  // 17: com.coralogix.alerts.v1.AlertFilters.RatioAlert.subsystems:type_name -> google.protobuf.StringValue
+	5,  // 18: com.coralogix.alerts.v1.AlertFilters.RatioAlert.group_by:type_name -> google.protobuf.StringValue
 	19, // [19:19] is the sub-list for method output_type
 	19, // [19:19] is the sub-list for method input_type
 	19, // [19:19] is the sub-list for extension type_name

@@ -20,9 +20,9 @@ import (
 	"fmt"
 	"reflect"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	rrg "github.com/coralogix/coralogix-operator-poc/controllers/clientset/grpc/recording-rules-groups/v2"
 	utils "github.com/coralogix/coralogix-operator-poc/apis"
+	rrg "github.com/coralogix/coralogix-operator-poc/controllers/clientset/grpc/recording-rules-groups/v2"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!

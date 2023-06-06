@@ -44,15 +44,22 @@ status:
   description: alert from k8s operator
   id: 703c20a9-dedc-490d-a6ec-9ca39b469307
   name: ratio alert example
-  notifications:
-    notifyEveryMin: 10
-    notifyOnlyOnTriggeredGroupByValues: true
-    onTriggerAndResolved: false
-    recipients:
-      emails:
-        - user@example.com
-      webhooks:
-        - WebhookAlerts
+  notificationGroups:
+    - notifications:
+        - notifyOn: TriggeredOnly
+          integrationID: 2235
+          retriggeringPeriodMinutes: 1
+        - notifyOn: TriggeredAndResolved
+          emailRecipients: [ "example@coralogix.com" ]
+          retriggeringPeriodMinutes: 1440
+    - groupByFields: [ "coralogix.metadata.sdkId" ]
+      notifications:
+        - notifyOn: TriggeredOnly
+          integrationID: 2235
+          retriggeringPeriodMinutes: 1
+        - notifyOn: TriggeredAndResolved
+          emailRecipients: [ "example2@coralogix.com" ]
+          retriggeringPeriodMinutes: 1440
   scheduling:
     daysEnabled:
       - Wednesday

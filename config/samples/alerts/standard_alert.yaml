@@ -15,13 +15,24 @@ spec:
   labels:
     alert_type: security
     security_severity: high
-  notifications:
-    recipients:
-      emails: ["user@example.com"]
-      webhooks: ["WebhookAlerts"]
-    notifyEveryMin: 10
+  notificationGroups:
+    - notifications:
+        - notifyOn: TriggeredOnly
+          integrationID: 2235
+          retriggeringPeriodMinutes: 1
+        - notifyOn: TriggeredAndResolved
+          emailRecipients: [ "example@coralogix.com" ]
+          retriggeringPeriodMinutes: 1440
+    - groupByFields: [ "coralogix.metadata.sdkId" ]
+      notifications:
+        - notifyOn: TriggeredOnly
+          integrationID: 2235
+          retriggeringPeriodMinutes: 1
+        - notifyOn: TriggeredAndResolved
+          emailRecipients: [ "example2@coralogix.com" ]
+          retriggeringPeriodMinutes: 1440
   scheduling:
-    daysEnabled: ["Wednesday", "Thursday"]
+    daysEnabled: [ "Wednesday", "Thursday" ]
     timeZone: UTC+02
     startTime: 08:00
     endTime: 20:00
@@ -29,11 +40,11 @@ spec:
     standard:
       filters:
         searchQuery: remote_addr_enriched:/.*/
-        applications: ["filter:contains:nginx"]
-        subsystems: ["filter:startsWith:subsystem-name"]
-        severities: ["Warning", "Info"]
+        applications: [ "filter:contains:nginx" ]
+        subsystems: [ "filter:startsWith:subsystem-name" ]
+        severities: [ "Warning", "Info" ]
       conditions:
         alertWhen: More
         threshold: 5
         timeWindow: FiveMinutes
-        groupBy: ["coralogix.metadata.sdkId"]
+        groupBy: [ "coralogix.metadata.sdkId" ]

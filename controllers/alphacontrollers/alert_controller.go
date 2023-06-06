@@ -35,7 +35,7 @@ import (
 	utils "github.com/coralogix/coralogix-operator-poc/apis"
 	coralogixv1alpha1 "github.com/coralogix/coralogix-operator-poc/apis/coralogix/v1alpha1"
 	"github.com/coralogix/coralogix-operator-poc/controllers/clientset"
-	alerts "github.com/coralogix/coralogix-operator-poc/controllers/clientset/grpc/alerts/v1"
+	alerts "github.com/coralogix/coralogix-operator-poc/controllers/clientset/grpc/alerts/v2"
 )
 
 var (
@@ -46,8 +46,7 @@ var (
 	alertProtoFiltersLogSeverityToSchemaFiltersLogSeverity           = utils.ReverseMap(coralogixv1alpha1.AlertSchemaFiltersLogSeverityToProtoFiltersLogSeverity)
 	alertProtoRelativeTimeFrameToSchemaTimeFrameAndRelativeTimeFrame = utils.ReverseMap(coralogixv1alpha1.AlertSchemaRelativeTimeFrameToProtoTimeFrameAndRelativeTimeFrame)
 	alertProtoArithmeticOperatorToSchemaArithmeticOperator           = utils.ReverseMap(coralogixv1alpha1.AlertSchemaArithmeticOperatorToProtoArithmeticOperator)
-	alertProtoTracingFilterFieldToSchemaTracingFilterField           = utils.ReverseMap(coralogixv1alpha1.AlertSchemaTracingFilterFieldToProtoTracingFilterField)
-	alertProtoTracingOperatorToSchemaTracingOperator                 = utils.ReverseMap(coralogixv1alpha1.AlertSchemaTracingOperatorToProtoTracingOperator)
+	alertProtoNotifyOn                                               = utils.ReverseMap(coralogixv1alpha1.AlertSchemaNotifyOnToProtoNotifyOn)
 	alertProtoFlowOperatorToProtoFlowOperator                        = utils.ReverseMap(coralogixv1alpha1.AlertSchemaFlowOperatorToProtoFlowOperator)
 )
 
@@ -102,6 +101,7 @@ func (r *AlertReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		if !controllerutil.ContainsFinalizer(alertCRD, myFinalizerName) {
 			controllerutil.AddFinalizer(alertCRD, myFinalizerName)
 			if err := r.Update(ctx, alertCRD); err != nil {
+				log.Error(err, "Error on updating alert", "Name", alertCRD.Name, "Namespace", alertCRD.Namespace)
 				return ctrl.Result{}, err
 			}
 		}
@@ -135,6 +135,7 @@ func (r *AlertReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 			// remove our finalizer from the list and update it.
 			controllerutil.RemoveFinalizer(alertCRD, myFinalizerName)
 			if err := r.Update(ctx, alertCRD); err != nil {
+				log.Error(err, "Error on updating alert", "Name", alertCRD.Name, "Namespace", alertCRD.Namespace)
 				return ctrl.Result{}, err
 			}
 		}
@@ -151,14 +152,19 @@ func (r *AlertReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		log.V(1).Info("alert wasn't created")
 		notFount = true
 	} else if getAlertResp, err := alertsClient.GetAlert(ctx, &alerts.GetAlertByUniqueIdRequest{Id: wrapperspb.String(*id)}); status.Code(err) == codes.NotFound {
-		log.V(1).Info("alert doesn't exist in Coralogix backend")
+		log.V(1).Info("alert doesn't exist in Coralogix backend", "ID", id)
 		notFount = true
 	} else if err == nil {
 		actualState = flattenAlert(getAlertResp.GetAlert(), alertCRD.Spec)
 	}
 
 	if notFount {
-		createAlertReq := alertCRD.Spec.ExtractCreateAlertRequest()
+		createAlertReq, err := alertCRD.Spec.ExtractCreateAlertRequest()
+		if err != nil {
+			log.Error(err, "Bad request for creating alert", "Name", alertCRD.Name, "Namespace", alertCRD.Namespace)
+			return ctrl.Result{}, err
+		}
+
 		jstr, _ := jsm.MarshalToString(createAlertReq)
 		log.V(1).Info("Creating Alert", "alert", jstr)
 		if createAlertResp, err := alertsClient.CreateAlert(ctx, createAlertReq); err == nil {
@@ -167,11 +173,12 @@ func (r *AlertReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 			actualState = flattenAlert(createAlertResp.GetAlert(), alertCRD.Spec)
 			alertCRD.Status = *actualState
 			if err := r.Status().Update(ctx, alertCRD); err != nil {
-				log.V(1).Error(err, "updating crd")
+				log.Error(err, "Error on updating alert", "Name", alertCRD.Name, "Namespace", alertCRD.Namespace)
+				return ctrl.Result{RequeueAfter: defaultErrRequeuePeriod}, err
 			}
 			return ctrl.Result{RequeueAfter: defaultRequeuePeriod}, nil
 		} else {
-			log.Error(err, "Received an error while creating Alert", "alert", createAlertResp)
+			log.Error(err, "Received an error while creating Alert", "Crating request", jstr)
 			return ctrl.Result{RequeueAfter: defaultErrRequeuePeriod}, err
 		}
 	} else if err != nil {
@@ -181,7 +188,12 @@ func (r *AlertReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 
 	if equal, diff := alertCRD.Spec.DeepEqual(actualState); !equal {
 		log.V(1).Info("Find diffs between spec and the actual state", "Diff", diff)
-		updateAlertReq := alertCRD.Spec.ExtractUpdateAlertRequest(*alertCRD.Status.ID)
+		updateAlertReq, err := alertCRD.Spec.ExtractUpdateAlertRequest(*alertCRD.Status.ID)
+		if err != nil {
+			log.Error(err, "Bad request for updating alert", "Name", alertCRD.Name, "Namespace", alertCRD.Namespace)
+			return ctrl.Result{}, err
+		}
+
 		updateAlertResp, err := alertsClient.UpdateAlert(ctx, updateAlertReq)
 		if err != nil {
 			log.Error(err, "Received an error while updating a Alert", "alert", updateAlertReq)
@@ -214,60 +226,54 @@ func flattenAlert(actualAlert *alerts.Alert, spec coralogixv1alpha1.AlertSpec) *
 
 	status.Scheduling = flattenScheduling(actualAlert.GetActiveWhen(), spec)
 
-	alertType, notifyData := flattenAlertType(actualAlert)
-	status.AlertType = alertType
+	status.AlertType = flattenAlertType(actualAlert)
 
-	status.Notifications = flattenNotifications(actualAlert.GetNotifications(), actualAlert.GetNotifyEvery(), notifyData)
+	status.NotificationGroups = flattenNotificationGroups(actualAlert.GetNotificationGroups())
+
+	status.ShowInInsight = flattenShowInInsight(actualAlert.GetShowInInsight())
 
 	return &status
 }
 
-type NotificationsAlertTypeData struct {
-	OnTriggerAndResolved *wrapperspb.BoolValue
-
-	NotifyOnlyOnTriggeredGroupByValues *wrapperspb.BoolValue
-}
-
-func flattenAlertType(actualAlert *alerts.Alert) (coralogixv1alpha1.AlertType, *NotificationsAlertTypeData) {
+func flattenAlertType(actualAlert *alerts.Alert) coralogixv1alpha1.AlertType {
 	actualFilters := actualAlert.GetFilters()
 	actualCondition := actualAlert.GetCondition()
 
 	var alertType coralogixv1alpha1.AlertType
-	var notifyData = new(NotificationsAlertTypeData)
 	switch actualFilters.GetFilterType() {
 	case alerts.AlertFilters_FILTER_TYPE_TEXT_OR_UNSPECIFIED:
 		if newValueCondition, ok := actualCondition.GetCondition().(*alerts.AlertCondition_NewValue); ok {
-			alertType.NewValue, notifyData = flattenNewValueAlert(actualFilters, newValueCondition)
+			alertType.NewValue = flattenNewValueAlert(actualFilters, newValueCondition)
 		} else {
-			alertType.Standard, notifyData = flattenStandardAlert(actualFilters, actualCondition)
+			alertType.Standard = flattenStandardAlert(actualFilters, actualCondition)
 		}
 	case alerts.AlertFilters_FILTER_TYPE_RATIO:
-		alertType.Ratio, notifyData = flattenRatioAlert(actualFilters, actualCondition)
+		alertType.Ratio = flattenRatioAlert(actualFilters, actualCondition)
 	case alerts.AlertFilters_FILTER_TYPE_UNIQUE_COUNT:
-		alertType.UniqueCount, notifyData = flattenUniqueCountAlert(actualFilters, actualCondition)
+		alertType.UniqueCount = flattenUniqueCountAlert(actualFilters, actualCondition)
 	case alerts.AlertFilters_FILTER_TYPE_TIME_RELATIVE:
-		alertType.TimeRelative, notifyData = flattenTimeRelativeAlert(actualFilters, actualCondition)
+		alertType.TimeRelative = flattenTimeRelativeAlert(actualFilters, actualCondition)
 	case alerts.AlertFilters_FILTER_TYPE_METRIC:
-		alertType.Metric, notifyData = flattenMetricAlert(actualFilters, actualCondition)
+		alertType.Metric = flattenMetricAlert(actualFilters, actualCondition)
 	case alerts.AlertFilters_FILTER_TYPE_TRACING:
 		alertType.Tracing = flattenTracingAlert(actualAlert.GetTracingAlert(), actualCondition)
 	case alerts.AlertFilters_FILTER_TYPE_FLOW:
 		alertType.Flow = flattenFlowAlert(actualCondition.GetFlow())
 	}
 
-	return alertType, notifyData
+	return alertType
 }
 
-func flattenNewValueAlert(filters *alerts.AlertFilters, condition *alerts.AlertCondition_NewValue) (*coralogixv1alpha1.NewValue, *NotificationsAlertTypeData) {
+func flattenNewValueAlert(filters *alerts.AlertFilters, condition *alerts.AlertCondition_NewValue) *coralogixv1alpha1.NewValue {
 	flattenedFilters := flattenFilters(filters)
-	newValueCondition, notifyData := flattenNewValueCondition(condition.NewValue.GetParameters())
+	newValueCondition := flattenNewValueCondition(condition.NewValue.GetParameters())
 
 	newValue := &coralogixv1alpha1.NewValue{
 		Filters:    flattenedFilters,
 		Conditions: newValueCondition,
 	}
 
-	return newValue, notifyData
+	return newValue
 }
 
 func flattenFilters(filters *alerts.AlertFilters) *coralogixv1alpha1.Filters {
@@ -311,7 +317,7 @@ func flattenSeverities(severities []alerts.AlertFilters_LogSeverity) []coralogix
 	return flattenedSeverities
 }
 
-func flattenNewValueCondition(conditionParams *alerts.ConditionParameters) (coralogixv1alpha1.NewValueConditions, *NotificationsAlertTypeData) {
+func flattenNewValueCondition(conditionParams *alerts.ConditionParameters) coralogixv1alpha1.NewValueConditions {
 	var key string
 	if actualKeys := conditionParams.GetGroupBy(); len(actualKeys) != 0 {
 		key = actualKeys[0].GetValue()
@@ -323,27 +329,22 @@ func flattenNewValueCondition(conditionParams *alerts.ConditionParameters) (cora
 		TimeWindow: timeWindow,
 	}
 
-	notifyData := &NotificationsAlertTypeData{
-		NotifyOnlyOnTriggeredGroupByValues: conditionParams.GetNotifyGroupByOnlyAlerts(),
-		OnTriggerAndResolved:               conditionParams.GetNotifyOnResolved(),
-	}
-
-	return newValueCondition, notifyData
+	return newValueCondition
 }
 
-func flattenStandardAlert(filters *alerts.AlertFilters, condition *alerts.AlertCondition) (*coralogixv1alpha1.Standard, *NotificationsAlertTypeData) {
+func flattenStandardAlert(filters *alerts.AlertFilters, condition *alerts.AlertCondition) *coralogixv1alpha1.Standard {
 	flattenedFilters := flattenFilters(filters)
-	standardCondition, notifyData := flattenStandardCondition(condition)
+	standardCondition := flattenStandardCondition(condition)
 
 	standard := &coralogixv1alpha1.Standard{
 		Filters:    flattenedFilters,
 		Conditions: standardCondition,
 	}
 
-	return standard, notifyData
+	return standard
 }
 
-func flattenStandardCondition(condition *alerts.AlertCondition) (coralogixv1alpha1.StandardConditions, *NotificationsAlertTypeData) {
+func flattenStandardCondition(condition *alerts.AlertCondition) coralogixv1alpha1.StandardConditions {
 	var standardCondition coralogixv1alpha1.StandardConditions
 	var conditionParams *alerts.ConditionParameters
 
@@ -381,22 +382,19 @@ func flattenStandardCondition(condition *alerts.AlertCondition) (coralogixv1alph
 		*standardCondition.Threshold = int(conditionParams.GetThreshold().GetValue())
 	case *alerts.AlertCondition_Immediate:
 		standardCondition.AlertWhen = coralogixv1alpha1.StandardAlertWhenImmediately
-		return standardCondition, new(NotificationsAlertTypeData)
+		return standardCondition
 	}
 
 	standardCondition.GroupBy = utils.WrappedStringSliceToStringSlice(conditionParams.GetGroupBy())
-	notifyData := new(NotificationsAlertTypeData)
-	notifyData.NotifyOnlyOnTriggeredGroupByValues = conditionParams.NotifyGroupByOnlyAlerts
-	notifyData.OnTriggerAndResolved = conditionParams.NotifyOnResolved
 
-	return standardCondition, notifyData
+	return standardCondition
 }
 
-func flattenRatioAlert(filters *alerts.AlertFilters, condition *alerts.AlertCondition) (*coralogixv1alpha1.Ratio, *NotificationsAlertTypeData) {
+func flattenRatioAlert(filters *alerts.AlertFilters, condition *alerts.AlertCondition) *coralogixv1alpha1.Ratio {
 	query1Filters := flattenFilters(filters)
 	q2Filters := filters.GetRatioAlerts()[0]
 	query2Filters := flattenRatioFilters(q2Filters)
-	ratioCondition, notifyData := flattenRatioCondition(condition, q2Filters.GetGroupBy())
+	ratioCondition := flattenRatioCondition(condition, q2Filters.GetGroupBy())
 
 	ratio := &coralogixv1alpha1.Ratio{
 		Query1Filters: *query1Filters,
@@ -404,7 +402,7 @@ func flattenRatioAlert(filters *alerts.AlertFilters, condition *alerts.AlertCond
 		Conditions:    ratioCondition,
 	}
 
-	return ratio, notifyData
+	return ratio
 }
 
 func flattenRatioFilters(filters *alerts.AlertFilters_RatioAlert) coralogixv1alpha1.RatioQ2Filters {
@@ -429,7 +427,7 @@ func flattenRatioFilters(filters *alerts.AlertFilters_RatioAlert) coralogixv1alp
 	return flattenedFilters
 }
 
-func flattenRatioCondition(condition *alerts.AlertCondition, groupByQ2 []*wrapperspb.StringValue) (coralogixv1alpha1.RatioConditions, *NotificationsAlertTypeData) {
+func flattenRatioCondition(condition *alerts.AlertCondition, groupByQ2 []*wrapperspb.StringValue) coralogixv1alpha1.RatioConditions {
 	var ratioCondition coralogixv1alpha1.RatioConditions
 	var conditionParams *alerts.ConditionParameters
 
@@ -474,26 +472,22 @@ func flattenRatioCondition(condition *alerts.AlertCondition, groupByQ2 []*wrappe
 		*ratioCondition.GroupByFor = coralogixv1alpha1.GroupByForBoth
 	}
 
-	notifyData := new(NotificationsAlertTypeData)
-	notifyData.NotifyOnlyOnTriggeredGroupByValues = conditionParams.NotifyGroupByOnlyAlerts
-	notifyData.OnTriggerAndResolved = conditionParams.NotifyOnResolved
-
-	return ratioCondition, notifyData
+	return ratioCondition
 }
 
-func flattenUniqueCountAlert(filters *alerts.AlertFilters, condition *alerts.AlertCondition) (*coralogixv1alpha1.UniqueCount, *NotificationsAlertTypeData) {
+func flattenUniqueCountAlert(filters *alerts.AlertFilters, condition *alerts.AlertCondition) *coralogixv1alpha1.UniqueCount {
 	flattenedFilters := flattenFilters(filters)
-	uniqueCountCondition, notifyData := flattenUniqueCountCondition(condition)
+	uniqueCountCondition := flattenUniqueCountCondition(condition)
 
 	ratio := &coralogixv1alpha1.UniqueCount{
 		Filters:    flattenedFilters,
 		Conditions: uniqueCountCondition,
 	}
 
-	return ratio, notifyData
+	return ratio
 }
 
-func flattenUniqueCountCondition(condition *alerts.AlertCondition) (coralogixv1alpha1.UniqueCountConditions, *NotificationsAlertTypeData) {
+func flattenUniqueCountCondition(condition *alerts.AlertCondition) coralogixv1alpha1.UniqueCountConditions {
 	conditionParams := condition.GetCondition().(*alerts.AlertCondition_UniqueCount).UniqueCount.GetParameters()
 	var uniqueCountCondition coralogixv1alpha1.UniqueCountConditions
 
@@ -508,26 +502,22 @@ func flattenUniqueCountCondition(condition *alerts.AlertCondition) (coralogixv1a
 		*uniqueCountCondition.MaxUniqueValuesForGroupBy = int(conditionParams.GetMaxUniqueCountValuesForGroupByKey().GetValue())
 	}
 
-	notifyData := new(NotificationsAlertTypeData)
-	notifyData.NotifyOnlyOnTriggeredGroupByValues = conditionParams.NotifyGroupByOnlyAlerts
-	notifyData.OnTriggerAndResolved = conditionParams.NotifyOnResolved
-
-	return uniqueCountCondition, notifyData
+	return uniqueCountCondition
 }
 
-func flattenTimeRelativeAlert(filters *alerts.AlertFilters, condition *alerts.AlertCondition) (*coralogixv1alpha1.TimeRelative, *NotificationsAlertTypeData) {
+func flattenTimeRelativeAlert(filters *alerts.AlertFilters, condition *alerts.AlertCondition) *coralogixv1alpha1.TimeRelative {
 	flattenedFilters := flattenFilters(filters)
-	timeRelativeCondition, notifyData := flattenTimeRelativeCondition(condition)
+	timeRelativeCondition := flattenTimeRelativeCondition(condition)
 
 	timeRelative := &coralogixv1alpha1.TimeRelative{
 		Filters:    flattenedFilters,
 		Conditions: timeRelativeCondition,
 	}
 
-	return timeRelative, notifyData
+	return timeRelative
 }
 
-func flattenTimeRelativeCondition(condition *alerts.AlertCondition) (coralogixv1alpha1.TimeRelativeConditions, *NotificationsAlertTypeData) {
+func flattenTimeRelativeCondition(condition *alerts.AlertCondition) coralogixv1alpha1.TimeRelativeConditions {
 	var conditionParams *alerts.ConditionParameters
 	var timeRelativeCondition coralogixv1alpha1.TimeRelativeConditions
 
@@ -561,16 +551,11 @@ func flattenTimeRelativeCondition(condition *alerts.AlertCondition) (coralogixv1
 	timeRelativeCondition.IgnoreInfinity = conditionParams.GetIgnoreInfinity().GetValue()
 	timeRelativeCondition.GroupBy = utils.WrappedStringSliceToStringSlice(conditionParams.GetGroupBy())
 
-	notifyData := new(NotificationsAlertTypeData)
-	notifyData.NotifyOnlyOnTriggeredGroupByValues = conditionParams.GetNotifyGroupByOnlyAlerts()
-	notifyData.OnTriggerAndResolved = conditionParams.GetNotifyOnResolved()
-
-	return timeRelativeCondition, notifyData
+	return timeRelativeCondition
 }
 
-func flattenMetricAlert(filters *alerts.AlertFilters, condition *alerts.AlertCondition) (*coralogixv1alpha1.Metric, *NotificationsAlertTypeData) {
+func flattenMetricAlert(filters *alerts.AlertFilters, condition *alerts.AlertCondition) *coralogixv1alpha1.Metric {
 	metric := new(coralogixv1alpha1.Metric)
-	notifyData := new(NotificationsAlertTypeData)
 
 	var conditionParams *alerts.ConditionParameters
 	var alertWhen coralogixv1alpha1.AlertWhen
@@ -584,15 +569,15 @@ func flattenMetricAlert(filters *alerts.AlertFilters, condition *alerts.AlertCon
 	}
 
 	if promqlParams := conditionParams.GetMetricAlertPromqlParameters(); promqlParams != nil {
-		metric.Promql, notifyData = flattenPromqlAlert(conditionParams, promqlParams, alertWhen)
+		metric.Promql = flattenPromqlAlert(conditionParams, promqlParams, alertWhen)
 	} else {
-		metric.Lucene, notifyData = flattenLuceneAlert(conditionParams, filters.GetText(), alertWhen)
+		metric.Lucene = flattenLuceneAlert(conditionParams, filters.GetText(), alertWhen)
 	}
 
-	return metric, notifyData
+	return metric
 }
 
-func flattenPromqlAlert(conditionParams *alerts.ConditionParameters, promqlParams *alerts.MetricAlertPromqlConditionParameters, alertWhen coralogixv1alpha1.AlertWhen) (*coralogixv1alpha1.Promql, *NotificationsAlertTypeData) {
+func flattenPromqlAlert(conditionParams *alerts.ConditionParameters, promqlParams *alerts.MetricAlertPromqlConditionParameters, alertWhen coralogixv1alpha1.AlertWhen) *coralogixv1alpha1.Promql {
 	promql := new(coralogixv1alpha1.Promql)
 
 	promql.SearchQuery = promqlParams.GetPromqlText().GetValue()
@@ -627,14 +612,10 @@ func flattenPromqlAlert(conditionParams *alerts.ConditionParameters, promqlParam
 		}
 	}
 
-	notifyData := new(NotificationsAlertTypeData)
-	notifyData.NotifyOnlyOnTriggeredGroupByValues = conditionParams.NotifyGroupByOnlyAlerts
-	notifyData.OnTriggerAndResolved = conditionParams.NotifyOnResolved
-
-	return promql, notifyData
+	return promql
 }
 
-func flattenLuceneAlert(conditionParams *alerts.ConditionParameters, searchQuery *wrapperspb.StringValue, alertWhen coralogixv1alpha1.AlertWhen) (*coralogixv1alpha1.Lucene, *NotificationsAlertTypeData) {
+func flattenLuceneAlert(conditionParams *alerts.ConditionParameters, searchQuery *wrapperspb.StringValue, alertWhen coralogixv1alpha1.AlertWhen) *coralogixv1alpha1.Lucene {
 	lucene := new(coralogixv1alpha1.Lucene)
 	metricParams := conditionParams.GetMetricAlertParameters()
 
@@ -677,11 +658,7 @@ func flattenLuceneAlert(conditionParams *alerts.ConditionParameters, searchQuery
 		}
 	}
 
-	notifyData := new(NotificationsAlertTypeData)
-	notifyData.NotifyOnlyOnTriggeredGroupByValues = conditionParams.NotifyGroupByOnlyAlerts
-	notifyData.OnTriggerAndResolved = conditionParams.NotifyOnResolved
-
-	return lucene, notifyData
+	return lucene
 }
 
 func flattenTracingAlert(tracingAlert *alerts.TracingAlert, condition *alerts.AlertCondition) *coralogixv1alpha1.Tracing {
@@ -968,26 +945,64 @@ func flattenDaysOfWeek(daysOfWeek []alerts.DayOfWeek, daysOffset int32) []coralo
 	return result
 }
 
-func flattenNotifications(recipients *alerts.AlertNotifications, notifyEverySec *wrapperspb.DoubleValue, notifyData *NotificationsAlertTypeData) *coralogixv1alpha1.Notifications {
-	flattenedRecipients := flattenRecipients(recipients)
-	notifyEveryMin := int(notifyEverySec.GetValue() / 60)
-	onTriggerAndResolved := notifyData.OnTriggerAndResolved.GetValue()
-	notifyOnlyOnTriggeredGroupByValues := notifyData.NotifyOnlyOnTriggeredGroupByValues.GetValue()
+func flattenNotificationGroups(notificationGroups []*alerts.AlertNotificationGroups) []coralogixv1alpha1.NotificationGroup {
+	result := make([]coralogixv1alpha1.NotificationGroup, 0, len(notificationGroups))
+	for _, ng := range notificationGroups {
+		notificationGroup := flattenNotificationGroup(ng)
+		result = append(result, notificationGroup)
+	}
+	return result
+}
 
-	return &coralogixv1alpha1.Notifications{
-		Recipients:                         flattenedRecipients,
-		NotifyEveryMin:                     &notifyEveryMin,
-		OnTriggerAndResolved:               onTriggerAndResolved,
-		NotifyOnlyOnTriggeredGroupByValues: notifyOnlyOnTriggeredGroupByValues,
+func flattenNotificationGroup(notificationGroup *alerts.AlertNotificationGroups) coralogixv1alpha1.NotificationGroup {
+	groupByFields := utils.WrappedStringSliceToStringSlice(notificationGroup.GroupByFields)
+	notifications := flattenNotifications(notificationGroup.Notifications)
+
+	return coralogixv1alpha1.NotificationGroup{
+		GroupByFields: groupByFields,
+		Notifications: notifications,
 	}
 }
 
-func flattenRecipients(recipients *alerts.AlertNotifications) coralogixv1alpha1.Recipients {
-	emails := utils.WrappedStringSliceToStringSlice(recipients.GetEmails())
-	webhooks := utils.WrappedStringSliceToStringSlice(recipients.GetIntegrations())
-	return coralogixv1alpha1.Recipients{
-		Emails:   emails,
-		Webhooks: webhooks,
+func flattenNotifications(notifications []*alerts.AlertNotification) []coralogixv1alpha1.Notification {
+	result := make([]coralogixv1alpha1.Notification, 0, len(notifications))
+	for _, n := range notifications {
+		notification := flattenNotification(n)
+		result = append(result, notification)
+	}
+	return result
+}
+
+func flattenNotification(notification *alerts.AlertNotification) coralogixv1alpha1.Notification {
+	notifyOn := alertProtoNotifyOn[notification.GetNotifyOn()]
+	retriggeringPeriodMinutes := int32(notification.GetRetriggeringPeriodSeconds().GetValue()) / 60
+	flattenedNotification := coralogixv1alpha1.Notification{
+		NotifyOn:                  notifyOn,
+		RetriggeringPeriodMinutes: retriggeringPeriodMinutes,
+	}
+
+	switch integration := notification.GetIntegrationType().(type) {
+	case *alerts.AlertNotification_IntegrationId:
+		flattenedNotification.IntegrationID = new(int32)
+		*flattenedNotification.IntegrationID = int32(integration.IntegrationId.GetValue())
+	case *alerts.AlertNotification_Recipients:
+		flattenedNotification.EmailRecipients = utils.WrappedStringSliceToStringSlice(integration.Recipients.Emails)
+	}
+
+	return flattenedNotification
+}
+
+func flattenShowInInsight(showInInsight *alerts.ShowInInsight) *coralogixv1alpha1.ShowInInsight {
+	if showInInsight == nil {
+		return nil
+	}
+
+	retriggeringPeriodMinutes := int32(showInInsight.GetRetriggeringPeriodSeconds().GetValue()) / 60
+	notifyOn := alertProtoNotifyOn[showInInsight.GetNotifyOn()]
+
+	return &coralogixv1alpha1.ShowInInsight{
+		RetriggeringPeriodMinutes: retriggeringPeriodMinutes,
+		NotifyOn:                  notifyOn,
 	}
 }
 

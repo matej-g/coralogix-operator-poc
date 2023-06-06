@@ -24,7 +24,7 @@ import (
 	"time"
 
 	utils "github.com/coralogix/coralogix-operator-poc/apis"
-	alerts "github.com/coralogix/coralogix-operator-poc/controllers/clientset/grpc/alerts/v1"
+	alerts "github.com/coralogix/coralogix-operator-poc/controllers/clientset/grpc/alerts/v2"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -99,19 +99,23 @@ var (
 		ArithmeticOperatorPercentile: alerts.MetricAlertConditionParameters_ARITHMETIC_OPERATOR_PERCENTILE,
 	}
 	AlertSchemaTracingFilterFieldToProtoTracingFilterField = map[FieldFilterType]string{
-		"Application": "applicationName",
-		"Subsystem":   "subsystemName",
-		"Service":     "serviceName",
+		FieldFilterTypeApplication: "applicationName",
+		FieldFilterTypeSubsystem:   "subsystemName",
+		FieldFilterTypeService:     "serviceName",
 	}
 	AlertSchemaTracingOperatorToProtoTracingOperator = map[FilterOperator]string{
-		"Equals":    "equals",
-		"Contains":  "contains",
-		"StartWith": "startsWith",
-		"EndWith":   "endsWith",
+		FilterOperatorEquals:    "equals",
+		FilterOperatorContains:  "contains",
+		FilterOperatorStartWith: "startsWith",
+		FilterOperatorEndWith:   "endsWith",
 	}
 	AlertSchemaFlowOperatorToProtoFlowOperator = map[FlowOperator]alerts.FlowOperator{
 		"And": alerts.FlowOperator_AND,
 		"Or":  alerts.FlowOperator_OR,
+	}
+	AlertSchemaNotifyOnToProtoNotifyOn = map[NotifyOn]alerts.NotifyOn{
+		NotifyOnTriggeredOnly:        alerts.NotifyOn_TRIGGERED_ONLY,
+		NotifyOnTriggeredAndResolved: alerts.NotifyOn_TRIGGERED_AND_RESOLVED,
 	}
 	msInHour   = int(time.Hour.Milliseconds())
 	msInMinute = int(time.Minute.Milliseconds())
@@ -142,7 +146,10 @@ type AlertSpec struct {
 	ExpirationDate *ExpirationDate `json:"expirationDate,omitempty"`
 
 	// +optional
-	Notifications *Notifications `json:"notifications,omitempty"`
+	NotificationGroups []NotificationGroup `json:"notificationGroups,omitempty"`
+
+	// +optional
+	ShowInInsight *ShowInInsight `json:"showInInsight,omitempty"`
 
 	// +optional
 	PayloadFilters []string `json:"payloadFilters,omitempty"`
@@ -152,25 +159,21 @@ type AlertSpec struct {
 	AlertType AlertType `json:"alertType,omitempty"`
 }
 
-func (in *AlertSpec) ExtractCreateAlertRequest() *alerts.CreateAlertRequest {
+func (in *AlertSpec) ExtractCreateAlertRequest() (*alerts.CreateAlertRequest, error) {
 	enabled := wrapperspb.Bool(in.Active)
 	name := wrapperspb.String(in.Name)
 	description := wrapperspb.String(in.Description)
 	severity := AlertSchemaSeverityToProtoSeverity[in.Severity]
 	metaLabels := expandMetaLabels(in.Labels)
 	expirationDate := expandExpirationDate(in.ExpirationDate)
-	var notifications *alerts.AlertNotifications
-	var notifyEvery *wrapperspb.DoubleValue
-	var onTriggerAndResolved, notifyOnlyOnTriggeredGroupByValues bool
-	if in.Notifications != nil {
-		notifications = expandNotifications(in.Notifications.Recipients)
-		notifyEvery = expandNotifyEvery(in.Notifications.NotifyEveryMin)
-		onTriggerAndResolved = in.Notifications.OnTriggerAndResolved
-		notifyOnlyOnTriggeredGroupByValues = in.Notifications.NotifyOnlyOnTriggeredGroupByValues
+	showInInsight := expandShowInInsight(in.ShowInInsight)
+	notificationGroups, err := expandNotificationGroups(in.NotificationGroups)
+	if err != nil {
+		return nil, err
 	}
 	payloadFilters := utils.StringSliceToWrappedStringSlice(in.PayloadFilters)
 	activeWhen := expandActiveWhen(in.Scheduling)
-	alertTypeParams := expandAlertType(in.AlertType, onTriggerAndResolved, notifyOnlyOnTriggeredGroupByValues)
+	alertTypeParams := expandAlertType(in.AlertType)
 
 	return &alerts.CreateAlertRequest{
 		Name:                       name,
@@ -179,14 +182,14 @@ func (in *AlertSpec) ExtractCreateAlertRequest() *alerts.CreateAlertRequest {
 		Severity:                   severity,
 		MetaLabels:                 metaLabels,
 		Expiration:                 expirationDate,
-		Notifications:              notifications,
-		NotifyEvery:                notifyEvery,
+		ShowInInsight:              showInInsight,
+		NotificationGroups:         notificationGroups,
 		NotificationPayloadFilters: payloadFilters,
 		ActiveWhen:                 activeWhen,
 		Filters:                    alertTypeParams.filters,
 		Condition:                  alertTypeParams.condition,
 		TracingAlert:               alertTypeParams.tracingAlert,
-	}
+	}, nil
 }
 
 type alertTypeParams struct {
@@ -195,21 +198,21 @@ type alertTypeParams struct {
 	tracingAlert *alerts.TracingAlert
 }
 
-func expandAlertType(alertType AlertType, onTriggerAndResolved, notifyOnlyOnTriggeredGroupByValues bool) alertTypeParams {
+func expandAlertType(alertType AlertType) alertTypeParams {
 	if standard := alertType.Standard; standard != nil {
-		return expandStandard(standard, onTriggerAndResolved, notifyOnlyOnTriggeredGroupByValues)
+		return expandStandard(standard)
 	} else if ratio := alertType.Ratio; ratio != nil {
-		return expandRatio(ratio, onTriggerAndResolved, notifyOnlyOnTriggeredGroupByValues)
+		return expandRatio(ratio)
 	} else if newValue := alertType.NewValue; newValue != nil {
 		return expandNewValue(newValue)
 	} else if uniqueCount := alertType.UniqueCount; uniqueCount != nil {
 		return expandUniqueCount(uniqueCount)
 	} else if timeRelative := alertType.TimeRelative; timeRelative != nil {
-		return expandTimeRelative(timeRelative, onTriggerAndResolved, notifyOnlyOnTriggeredGroupByValues)
+		return expandTimeRelative(timeRelative)
 	} else if metric := alertType.Metric; metric != nil {
-		return expandMetric(metric, onTriggerAndResolved, notifyOnlyOnTriggeredGroupByValues)
+		return expandMetric(metric)
 	} else if tracing := alertType.Tracing; tracing != nil {
-		return expandTracing(tracing, onTriggerAndResolved)
+		return expandTracing(tracing)
 	} else if flow := alertType.Flow; flow != nil {
 		return expandFlow(flow)
 	}
@@ -217,8 +220,8 @@ func expandAlertType(alertType AlertType, onTriggerAndResolved, notifyOnlyOnTrig
 	return alertTypeParams{}
 }
 
-func expandStandard(standard *Standard, notifyWhenResolved, notifyOnlyOnTriggeredGroupByValues bool) alertTypeParams {
-	condition := expandStandardCondition(standard.Conditions, notifyWhenResolved, notifyOnlyOnTriggeredGroupByValues)
+func expandStandard(standard *Standard) alertTypeParams {
+	condition := expandStandardCondition(standard.Conditions)
 	filters := expandCommonFilters(standard.Filters)
 	filters.FilterType = alerts.AlertFilters_FILTER_TYPE_TEXT_OR_UNSPECIFIED
 	return alertTypeParams{
@@ -227,7 +230,7 @@ func expandStandard(standard *Standard, notifyWhenResolved, notifyOnlyOnTriggere
 	}
 }
 
-func expandRatio(ratio *Ratio, notifyWhenResolved, notifyOnlyOnTriggeredGroupByValues bool) alertTypeParams {
+func expandRatio(ratio *Ratio) alertTypeParams {
 	groupBy := utils.StringSliceToWrappedStringSlice(ratio.Conditions.GroupBy)
 	var groupByQ1, groupByQ2 []*wrapperspb.StringValue
 	if groupByFor := ratio.Conditions.GroupByFor; groupByFor != nil {
@@ -242,7 +245,7 @@ func expandRatio(ratio *Ratio, notifyWhenResolved, notifyOnlyOnTriggeredGroupByV
 		}
 	}
 
-	condition := expandRatioCondition(ratio.Conditions, groupByQ1, notifyWhenResolved, notifyOnlyOnTriggeredGroupByValues)
+	condition := expandRatioCondition(ratio.Conditions, groupByQ1)
 	filters := expandRatioFilters(&ratio.Query1Filters, &ratio.Query2Filters, groupByQ2)
 
 	return alertTypeParams{
@@ -251,22 +254,18 @@ func expandRatio(ratio *Ratio, notifyWhenResolved, notifyOnlyOnTriggeredGroupByV
 	}
 }
 
-func expandRatioCondition(conditions RatioConditions, q1GroupBy []*wrapperspb.StringValue, notifyWhenResolved, notifyOnlyOnTriggeredGroupByValues bool) *alerts.AlertCondition {
+func expandRatioCondition(conditions RatioConditions, q1GroupBy []*wrapperspb.StringValue) *alerts.AlertCondition {
 	threshold := wrapperspb.Double(conditions.Ratio.AsApproximateFloat64())
 	timeFrame := AlertSchemaTimeWindowToProtoTimeWindow[string(conditions.TimeWindow)]
-	notifyOnResolved := wrapperspb.Bool(notifyWhenResolved)
-	notifyGroupByOnlyAlerts := wrapperspb.Bool(notifyOnlyOnTriggeredGroupByValues)
 	ignoreInfinity := wrapperspb.Bool(conditions.IgnoreInfinity)
 	relatedExtendedData := expandRelatedData(conditions.ManageUndetectedValues)
 
 	parameters := &alerts.ConditionParameters{
-		Threshold:               threshold,
-		Timeframe:               timeFrame,
-		GroupBy:                 q1GroupBy,
-		NotifyOnResolved:        notifyOnResolved,
-		IgnoreInfinity:          ignoreInfinity,
-		NotifyGroupByOnlyAlerts: notifyGroupByOnlyAlerts,
-		RelatedExtendedData:     relatedExtendedData,
+		Threshold:           threshold,
+		Timeframe:           timeFrame,
+		GroupBy:             q1GroupBy,
+		IgnoreInfinity:      ignoreInfinity,
+		RelatedExtendedData: relatedExtendedData,
 	}
 
 	switch conditions.AlertWhen {
@@ -387,8 +386,8 @@ func expandUniqueCountCondition(conditions *UniqueCountConditions) *alerts.Alert
 	}
 }
 
-func expandTimeRelative(timeRelative *TimeRelative, notifyWhenResolved, notifyOnlyOnTriggeredGroupByValues bool) alertTypeParams {
-	condition := expandTimeRelativeCondition(&timeRelative.Conditions, notifyWhenResolved, notifyOnlyOnTriggeredGroupByValues)
+func expandTimeRelative(timeRelative *TimeRelative) alertTypeParams {
+	condition := expandTimeRelativeCondition(&timeRelative.Conditions)
 	filters := expandCommonFilters(timeRelative.Filters)
 	filters.FilterType = alerts.AlertFilters_FILTER_TYPE_TIME_RELATIVE
 	return alertTypeParams{
@@ -397,24 +396,20 @@ func expandTimeRelative(timeRelative *TimeRelative, notifyWhenResolved, notifyOn
 	}
 }
 
-func expandTimeRelativeCondition(condition *TimeRelativeConditions, notifyWhenResolved, notifyOnlyOnTriggeredGroupByValues bool) *alerts.AlertCondition {
+func expandTimeRelativeCondition(condition *TimeRelativeConditions) *alerts.AlertCondition {
 	threshold := wrapperspb.Double(condition.Threshold.AsApproximateFloat64())
 	timeFrameAndRelativeTimeFrame := AlertSchemaRelativeTimeFrameToProtoTimeFrameAndRelativeTimeFrame[condition.TimeWindow]
 	groupBy := utils.StringSliceToWrappedStringSlice(condition.GroupBy)
-	notifyOnResolved := wrapperspb.Bool(notifyWhenResolved)
-	notifyGroupByOnlyAlerts := wrapperspb.Bool(notifyOnlyOnTriggeredGroupByValues)
 	ignoreInf := wrapperspb.Bool(condition.IgnoreInfinity)
 	relatedExtendedData := expandRelatedData(condition.ManageUndetectedValues)
 
 	parameters := &alerts.ConditionParameters{
-		Timeframe:               timeFrameAndRelativeTimeFrame.TimeFrame,
-		RelativeTimeframe:       timeFrameAndRelativeTimeFrame.RelativeTimeFrame,
-		GroupBy:                 groupBy,
-		Threshold:               threshold,
-		IgnoreInfinity:          ignoreInf,
-		NotifyOnResolved:        notifyOnResolved,
-		NotifyGroupByOnlyAlerts: notifyGroupByOnlyAlerts,
-		RelatedExtendedData:     relatedExtendedData,
+		Timeframe:           timeFrameAndRelativeTimeFrame.TimeFrame,
+		RelativeTimeframe:   timeFrameAndRelativeTimeFrame.RelativeTimeFrame,
+		GroupBy:             groupBy,
+		Threshold:           threshold,
+		IgnoreInfinity:      ignoreInf,
+		RelatedExtendedData: relatedExtendedData,
 	}
 
 	switch condition.AlertWhen {
@@ -435,18 +430,18 @@ func expandTimeRelativeCondition(condition *TimeRelativeConditions, notifyWhenRe
 	return nil
 }
 
-func expandMetric(metric *Metric, notifyWhenResolved, notifyOnlyOnTriggeredGroupByValues bool) alertTypeParams {
+func expandMetric(metric *Metric) alertTypeParams {
 	if promql := metric.Promql; promql != nil {
-		return expandPromql(promql, notifyWhenResolved)
+		return expandPromql(promql)
 	} else if lucene := metric.Lucene; lucene != nil {
-		return expandLucene(lucene, notifyWhenResolved, notifyOnlyOnTriggeredGroupByValues)
+		return expandLucene(lucene)
 	}
 
 	return alertTypeParams{}
 }
 
-func expandPromql(promql *Promql, notifyWhenResolved bool) alertTypeParams {
-	condition := expandPromqlCondition(&promql.Conditions, promql.SearchQuery, notifyWhenResolved)
+func expandPromql(promql *Promql) alertTypeParams {
+	condition := expandPromqlCondition(&promql.Conditions, promql.SearchQuery)
 	filters := &alerts.AlertFilters{
 		FilterType: alerts.AlertFilters_FILTER_TYPE_METRIC,
 	}
@@ -457,7 +452,7 @@ func expandPromql(promql *Promql, notifyWhenResolved bool) alertTypeParams {
 	}
 }
 
-func expandPromqlCondition(conditions *PromqlConditions, searchQuery string, notifyWhenResolved bool) *alerts.AlertCondition {
+func expandPromqlCondition(conditions *PromqlConditions, searchQuery string) *alerts.AlertCondition {
 	text := wrapperspb.String(searchQuery)
 	sampleThresholdPercentage := wrapperspb.UInt32(uint32(conditions.SampleThresholdPercentage))
 	var nonNullPercentage *wrapperspb.UInt32Value
@@ -474,14 +469,12 @@ func expandPromqlCondition(conditions *PromqlConditions, searchQuery string, not
 	threshold := wrapperspb.Double(conditions.Threshold.AsApproximateFloat64())
 	timeWindow := AlertSchemaTimeWindowToProtoTimeWindow[string(conditions.TimeWindow)]
 	relatedExtendedData := expandRelatedData(conditions.ManageUndetectedValues)
-	notifyOnResolved := wrapperspb.Bool(notifyWhenResolved)
 
 	parameters := &alerts.ConditionParameters{
 		Threshold:                   threshold,
 		Timeframe:                   timeWindow,
 		RelatedExtendedData:         relatedExtendedData,
 		MetricAlertPromqlParameters: promqlParams,
-		NotifyOnResolved:            notifyOnResolved,
 	}
 
 	switch conditions.AlertWhen {
@@ -502,8 +495,8 @@ func expandPromqlCondition(conditions *PromqlConditions, searchQuery string, not
 	return nil
 }
 
-func expandLucene(lucene *Lucene, notifyWhenResolved, notifyOnlyOnTriggeredGroupByValues bool) alertTypeParams {
-	condition := expandLuceneCondition(&lucene.Conditions, notifyWhenResolved, notifyOnlyOnTriggeredGroupByValues)
+func expandLucene(lucene *Lucene) alertTypeParams {
+	condition := expandLuceneCondition(&lucene.Conditions)
 	var text *wrapperspb.StringValue
 	if searchQuery := lucene.SearchQuery; searchQuery != nil {
 		text = wrapperspb.String(*searchQuery)
@@ -520,7 +513,7 @@ func expandLucene(lucene *Lucene, notifyWhenResolved, notifyOnlyOnTriggeredGroup
 	}
 }
 
-func expandLuceneCondition(conditions *LuceneConditions, notifyWhenResolved, notifyOnlyOnTriggeredGroupByValues bool) *alerts.AlertCondition {
+func expandLuceneCondition(conditions *LuceneConditions) *alerts.AlertCondition {
 	metricField := wrapperspb.String(conditions.MetricField)
 	arithmeticOperator := AlertSchemaArithmeticOperatorToProtoArithmeticOperator[conditions.ArithmeticOperator]
 	var arithmeticOperatorModifier *wrapperspb.UInt32Value
@@ -545,17 +538,13 @@ func expandLuceneCondition(conditions *LuceneConditions, notifyWhenResolved, not
 	threshold := wrapperspb.Double(conditions.Threshold.AsApproximateFloat64())
 	timeWindow := AlertSchemaTimeWindowToProtoTimeWindow[string(conditions.TimeWindow)]
 	relatedExtendedData := expandRelatedData(conditions.ManageUndetectedValues)
-	notifyOnResolved := wrapperspb.Bool(notifyWhenResolved)
-	notifyGroupByOnlyAlerts := wrapperspb.Bool(notifyOnlyOnTriggeredGroupByValues)
 
 	parameters := &alerts.ConditionParameters{
-		GroupBy:                 groupBy,
-		Threshold:               threshold,
-		Timeframe:               timeWindow,
-		RelatedExtendedData:     relatedExtendedData,
-		NotifyOnResolved:        notifyOnResolved,
-		NotifyGroupByOnlyAlerts: notifyGroupByOnlyAlerts,
-		MetricAlertParameters:   luceneParams,
+		GroupBy:               groupBy,
+		Threshold:             threshold,
+		Timeframe:             timeWindow,
+		RelatedExtendedData:   relatedExtendedData,
+		MetricAlertParameters: luceneParams,
 	}
 
 	switch conditions.AlertWhen {
@@ -576,11 +565,11 @@ func expandLuceneCondition(conditions *LuceneConditions, notifyWhenResolved, not
 	return nil
 }
 
-func expandTracing(tracing *Tracing, notifyWhenResolved bool) alertTypeParams {
+func expandTracing(tracing *Tracing) alertTypeParams {
 	filters := &alerts.AlertFilters{
 		FilterType: alerts.AlertFilters_FILTER_TYPE_TRACING,
 	}
-	condition := expandTracingCondition(&tracing.Conditions, notifyWhenResolved)
+	condition := expandTracingCondition(&tracing.Conditions)
 	tracingAlert := expandTracingAlert(&tracing.Filters)
 	return alertTypeParams{
 		filters:      filters,
@@ -589,7 +578,7 @@ func expandTracing(tracing *Tracing, notifyWhenResolved bool) alertTypeParams {
 	}
 }
 
-func expandTracingCondition(conditions *TracingCondition, notifyWhenResolved bool) *alerts.AlertCondition {
+func expandTracingCondition(conditions *TracingCondition) *alerts.AlertCondition {
 	switch conditions.AlertWhen {
 	case "More":
 		var timeFrame alerts.Timeframe
@@ -598,15 +587,13 @@ func expandTracingCondition(conditions *TracingCondition, notifyWhenResolved boo
 		}
 		groupBy := utils.StringSliceToWrappedStringSlice(conditions.GroupBy)
 		threshold := wrapperspb.Double(float64(*conditions.Threshold))
-		notifyOnResolved := wrapperspb.Bool(notifyWhenResolved)
 		return &alerts.AlertCondition{
 			Condition: &alerts.AlertCondition_MoreThan{
 				MoreThan: &alerts.MoreThanCondition{
 					Parameters: &alerts.ConditionParameters{
-						Timeframe:        timeFrame,
-						Threshold:        threshold,
-						GroupBy:          groupBy,
-						NotifyOnResolved: notifyOnResolved,
+						Timeframe: timeFrame,
+						Threshold: threshold,
+						GroupBy:   groupBy,
 					},
 				},
 			},
@@ -809,7 +796,7 @@ func expandMetadata(filters *Filters) *alerts.AlertFilters_MetadataFilters {
 	}
 }
 
-func expandStandardCondition(condition StandardConditions, notifyWhenResolved, notifyOnlyOnTriggeredGroupByValues bool) *alerts.AlertCondition {
+func expandStandardCondition(condition StandardConditions) *alerts.AlertCondition {
 	var threshold *wrapperspb.DoubleValue
 	if condition.Threshold != nil {
 		threshold = wrapperspb.Double(float64(*condition.Threshold))
@@ -819,17 +806,13 @@ func expandStandardCondition(condition StandardConditions, notifyWhenResolved, n
 		timeFrame = AlertSchemaTimeWindowToProtoTimeWindow[string(*condition.TimeWindow)]
 	}
 	groupBy := utils.StringSliceToWrappedStringSlice(condition.GroupBy)
-	notifyOnResolved := wrapperspb.Bool(notifyWhenResolved)
-	notifyGroupByOnlyAlerts := wrapperspb.Bool(notifyOnlyOnTriggeredGroupByValues)
 	relatedExtendedData := expandRelatedData(condition.ManageUndetectedValues)
 
 	parameters := &alerts.ConditionParameters{
-		Threshold:               threshold,
-		Timeframe:               timeFrame,
-		GroupBy:                 groupBy,
-		NotifyOnResolved:        notifyOnResolved,
-		NotifyGroupByOnlyAlerts: notifyGroupByOnlyAlerts,
-		RelatedExtendedData:     relatedExtendedData,
+		Threshold:           threshold,
+		Timeframe:           timeFrame,
+		GroupBy:             groupBy,
+		RelatedExtendedData: relatedExtendedData,
 	}
 
 	switch condition.AlertWhen {
@@ -989,11 +972,86 @@ func expandExpirationDate(date *ExpirationDate) *alerts.Date {
 	}
 }
 
-func expandNotifications(recipients Recipients) *alerts.AlertNotifications {
-	return &alerts.AlertNotifications{
-		Emails:       utils.StringSliceToWrappedStringSlice(recipients.Emails),
-		Integrations: utils.StringSliceToWrappedStringSlice(recipients.Webhooks),
+func expandShowInInsight(showInInsight *ShowInInsight) *alerts.ShowInInsight {
+	if showInInsight == nil {
+		return nil
 	}
+
+	retriggeringPeriodSeconds := wrapperspb.UInt32(uint32(showInInsight.RetriggeringPeriodMinutes) * 60)
+	notifyOn := AlertSchemaNotifyOnToProtoNotifyOn[showInInsight.NotifyOn]
+
+	return &alerts.ShowInInsight{
+		RetriggeringPeriodSeconds: retriggeringPeriodSeconds,
+		NotifyOn:                  &notifyOn,
+	}
+}
+
+func expandNotificationGroups(notificationGroups []NotificationGroup) ([]*alerts.AlertNotificationGroups, error) {
+	result := make([]*alerts.AlertNotificationGroups, 0, len(notificationGroups))
+	for i, ng := range notificationGroups {
+		notificationGroup, err := expandNotificationGroup(ng)
+		if err != nil {
+			return nil, fmt.Errorf("error on notificationGroups[%d] - %s", i, err.Error())
+		}
+		result = append(result, notificationGroup)
+	}
+	return result, nil
+}
+
+func expandNotificationGroup(notificationGroup NotificationGroup) (*alerts.AlertNotificationGroups, error) {
+	groupFields := utils.StringSliceToWrappedStringSlice(notificationGroup.GroupByFields)
+	notifications, err := expandNotifications(notificationGroup.Notifications)
+	if err != nil {
+		return nil, err
+	}
+
+	return &alerts.AlertNotificationGroups{
+		GroupByFields: groupFields,
+		Notifications: notifications,
+	}, nil
+}
+
+func expandNotifications(notifications []Notification) ([]*alerts.AlertNotification, error) {
+	result := make([]*alerts.AlertNotification, 0, len(notifications))
+	for i, n := range notifications {
+		notification, err := expandNotification(n)
+		if err != nil {
+			return nil, fmt.Errorf("error on notifications[%d] - %s", i, err.Error())
+		}
+		result = append(result, notification)
+	}
+	return result, nil
+}
+
+func expandNotification(notification Notification) (*alerts.AlertNotification, error) {
+	retriggeringPeriodSeconds := wrapperspb.UInt32(uint32(60 * notification.RetriggeringPeriodMinutes))
+	notifyOn := AlertSchemaNotifyOnToProtoNotifyOn[notification.NotifyOn]
+
+	result := &alerts.AlertNotification{
+		RetriggeringPeriodSeconds: retriggeringPeriodSeconds,
+		NotifyOn:                  &notifyOn,
+	}
+
+	if integrationID := notification.IntegrationID; integrationID != nil {
+		result.IntegrationType = &alerts.AlertNotification_IntegrationId{
+			IntegrationId: wrapperspb.UInt32(uint32(*integrationID)),
+		}
+	}
+
+	emails := notification.EmailRecipients
+	{
+		if result.IntegrationType != nil && len(emails) != 0 {
+			return nil, fmt.Errorf("required exactly on of 'integrationID' or 'emailRecipients'")
+		}
+
+		result.IntegrationType = &alerts.AlertNotification_Recipients{
+			Recipients: &alerts.Recipients{
+				Emails: utils.StringSliceToWrappedStringSlice(emails),
+			},
+		}
+	}
+
+	return result, nil
 }
 
 func expandNotifyEvery(notifyEveryMin *int) *wrapperspb.DoubleValue {
@@ -1002,14 +1060,6 @@ func expandNotifyEvery(notifyEveryMin *int) *wrapperspb.DoubleValue {
 	}
 	return wrapperspb.Double(float64(60 * *notifyEveryMin))
 }
-
-//func emailSliceToWrappedStringSlice(arr []Email) []*wrapperspb.StringValue {
-//	result := make([]*wrapperspb.StringValue, 0, len(arr))
-//	for _, s := range arr {
-//		result = append(result, wrapperspb.String(string(s)))
-//	}
-//	return result
-//}
 
 func (in *AlertSpec) DeepEqual(actualAlert *AlertStatus) (bool, utils.Diff) {
 	if actualName := actualAlert.Name; actualName != in.Name {
@@ -1068,11 +1118,10 @@ func (in *AlertSpec) DeepEqual(actualAlert *AlertStatus) (bool, utils.Diff) {
 		}
 	}
 
-	if equal, diff := in.Notifications.DeepEqual(actualAlert.Notifications); !equal {
-		return false, utils.Diff{
-			Name:    fmt.Sprintf("Notifications.%s", diff.Name),
-			Desired: diff.Desired,
-			Actual:  diff.Actual,
+	notificationGroups, actualNotificationGroups := in.NotificationGroups, actualAlert.NotificationGroups
+	{
+		if equal, diff := DeepEqualNotificationGroups(notificationGroups, actualNotificationGroups); !equal {
+			return false, diff
 		}
 	}
 
@@ -1100,10 +1149,54 @@ func (in *AlertSpec) DeepEqual(actualAlert *AlertStatus) (bool, utils.Diff) {
 		}
 	}
 
+	showInInsight, actualShowInInsight := in.ShowInInsight, actualAlert.ShowInInsight
+	{
+		if showInInsight != nil {
+			if actualShowInInsight == nil {
+				return false, utils.Diff{
+					Name:    "ShowInInsight",
+					Desired: *showInInsight,
+					Actual:  actualShowInInsight,
+				}
+			} else if equal, diff := showInInsight.DeepEqual(*actualShowInInsight); !equal {
+				return false, utils.Diff{
+					Name:    fmt.Sprintf("ShowInInsight.%s", diff.Name),
+					Desired: diff.Desired,
+					Actual:  diff.Actual,
+				}
+			}
+		}
+	}
+
 	return true, utils.Diff{}
 }
 
-func (in *AlertSpec) ExtractUpdateAlertRequest(id string) *alerts.UpdateAlertByUniqueIdRequest {
+func DeepEqualNotificationGroups(notificationGroups []NotificationGroup, actualNotificationGroups []NotificationGroup) (bool, utils.Diff) {
+	if length, actualLength := len(notificationGroups), len(actualNotificationGroups); length != actualLength {
+		return false, utils.Diff{
+			Name:    "Notifications.Length",
+			Desired: length,
+			Actual:  actualLength,
+		}
+	}
+
+	for i := range notificationGroups {
+		notificationGroup, actualNotificationGroup := notificationGroups[i], actualNotificationGroups[i]
+		{
+			if equal, diff := notificationGroup.DeepEqual(actualNotificationGroup); !equal {
+				return false, utils.Diff{
+					Name:    fmt.Sprintf("Notifications.%d.%s", i, diff.Name),
+					Desired: diff.Desired,
+					Actual:  diff.Actual,
+				}
+			}
+		}
+	}
+
+	return false, utils.Diff{}
+}
+
+func (in *AlertSpec) ExtractUpdateAlertRequest(id string) (*alerts.UpdateAlertByUniqueIdRequest, error) {
 	uniqueIdentifier := wrapperspb.String(id)
 	enabled := wrapperspb.Bool(in.Active)
 	name := wrapperspb.String(in.Name)
@@ -1111,12 +1204,14 @@ func (in *AlertSpec) ExtractUpdateAlertRequest(id string) *alerts.UpdateAlertByU
 	severity := AlertSchemaSeverityToProtoSeverity[in.Severity]
 	metaLabels := expandMetaLabels(in.Labels)
 	expirationDate := expandExpirationDate(in.ExpirationDate)
-	notifications := expandNotifications(in.Notifications.Recipients)
-	notifyEvery := expandNotifyEvery(in.Notifications.NotifyEveryMin)
+	showInInsight := expandShowInInsight(in.ShowInInsight)
+	notificationGroups, err := expandNotificationGroups(in.NotificationGroups)
+	if err != nil {
+		return nil, err
+	}
 	payloadFilters := utils.StringSliceToWrappedStringSlice(in.PayloadFilters)
 	activeWhen := expandActiveWhen(in.Scheduling)
-	alertTypeParams := expandAlertType(in.AlertType, in.Notifications.OnTriggerAndResolved,
-		in.Notifications.NotifyOnlyOnTriggeredGroupByValues)
+	alertTypeParams := expandAlertType(in.AlertType)
 
 	return &alerts.UpdateAlertByUniqueIdRequest{
 		Alert: &alerts.Alert{
@@ -1127,15 +1222,15 @@ func (in *AlertSpec) ExtractUpdateAlertRequest(id string) *alerts.UpdateAlertByU
 			Severity:                   severity,
 			MetaLabels:                 metaLabels,
 			Expiration:                 expirationDate,
-			Notifications:              notifications,
-			NotifyEvery:                notifyEvery,
+			ShowInInsight:              showInInsight,
+			NotificationGroups:         notificationGroups,
 			NotificationPayloadFilters: payloadFilters,
 			ActiveWhen:                 activeWhen,
 			Filters:                    alertTypeParams.filters,
 			Condition:                  alertTypeParams.condition,
 			TracingAlert:               alertTypeParams.tracingAlert,
 		},
-	}
+	}, nil
 }
 
 // +kubebuilder:validation:Enum=Info;Warning;Critical;Error
@@ -1166,56 +1261,124 @@ func (in *ExpirationDate) DeepEqual(date *alerts.Date) bool {
 	return in.Year != date.Year || in.Month != date.Month || in.Day != date.Day
 }
 
-type Notifications struct {
-	//+kubebuilder:default=false
-	OnTriggerAndResolved bool `json:"onTriggerAndResolved,omitempty"`
-
-	//+kubebuilder:default=false
-	NotifyOnlyOnTriggeredGroupByValues bool `json:"notifyOnlyOnTriggeredGroupByValues,omitempty"`
-
+type NotificationGroup struct {
 	// +optional
-	Recipients Recipients `json:"recipients,omitempty"`
+	GroupByFields []string `json:"groupByFields,omitempty"`
 
-	// +optional
-	// +kubebuilder:validation:Minimum:=1
-	NotifyEveryMin *int `json:"notifyEveryMin,omitempty"`
+	Notifications []Notification `json:"notifications,omitempty"`
 }
 
-func (in *Notifications) DeepEqual(actualNotifications *Notifications) (bool, utils.Diff) {
-	if equal, diff := in.Recipients.DeepEqual(actualNotifications.Recipients); !equal {
+func (in *NotificationGroup) DeepEqual(actualNotificationGroup NotificationGroup) (bool, utils.Diff) {
+	if groupByFields, actualGroupByFields := in.GroupByFields, actualNotificationGroup.GroupByFields; !utils.SlicesWithUniqueValuesEqual(groupByFields, actualGroupByFields) {
 		return false, utils.Diff{
-			Name:    fmt.Sprintf("Recipients.%s", diff.Name),
-			Desired: diff.Desired,
-			Actual:  diff.Actual,
+			Name:    "GroupByFields",
+			Desired: groupByFields,
+			Actual:  actualGroupByFields,
 		}
 	}
 
-	if !reflect.DeepEqual(in.NotifyEveryMin, actualNotifications.NotifyEveryMin) {
-		return false, utils.Diff{
-			Name:    "NotifyEveryMin",
-			Desired: in.NotifyEveryMin,
-			Actual:  utils.PointerToString(actualNotifications.NotifyEveryMin),
+	notifications, actualNotifications := in.Notifications, actualNotificationGroup.Notifications
+	{
+		if length, actualLength := len(notifications), len(actualNotifications); length != actualLength {
+			return false, utils.Diff{
+				Name:    "Notifications.Length",
+				Desired: length,
+				Actual:  actualLength,
+			}
 		}
-	}
 
-	if in.OnTriggerAndResolved != actualNotifications.OnTriggerAndResolved {
-		return false, utils.Diff{
-			Name:    "OnTriggerAndResolved",
-			Desired: in.OnTriggerAndResolved,
-			Actual:  actualNotifications.OnTriggerAndResolved,
-		}
-	}
+		for i := range notifications {
+			notification, actualNotification := notifications[i], actualNotifications[i]
+			{
+				if equal, diff := notification.DeepEqual(actualNotification); !equal {
+					return false, utils.Diff{
+						Name:    fmt.Sprintf("Notifications[%d].%s", i, diff.Name),
+						Desired: diff.Desired,
+						Actual:  diff.Actual,
+					}
+				}
+			}
 
-	if in.NotifyOnlyOnTriggeredGroupByValues != actualNotifications.NotifyOnlyOnTriggeredGroupByValues {
-		return false, utils.Diff{
-			Name:    "NotifyOnlyOnTriggeredGroupByValues",
-			Desired: in.NotifyOnlyOnTriggeredGroupByValues,
-			Actual:  actualNotifications.NotifyOnlyOnTriggeredGroupByValues,
 		}
 	}
 
 	return true, utils.Diff{}
 }
+
+type Notification struct {
+	RetriggeringPeriodMinutes int32 `json:"retriggeringPeriodMinutes,omitempty"`
+
+	NotifyOn NotifyOn `json:"notifyOn,omitempty"`
+
+	// +optional
+	IntegrationID *int32 `json:"integrationID,omitempty"`
+
+	// +optional
+	EmailRecipients []string `json:"emailRecipients,omitempty"`
+}
+
+func (in *Notification) DeepEqual(actualNotification Notification) (bool, utils.Diff) {
+	if in.RetriggeringPeriodMinutes != actualNotification.RetriggeringPeriodMinutes {
+		return false, utils.Diff{
+			Name:    "RetriggeringPeriodMinutes",
+			Desired: in.RetriggeringPeriodMinutes,
+			Actual:  actualNotification.RetriggeringPeriodMinutes,
+		}
+	}
+
+	if !reflect.DeepEqual(in.IntegrationID, actualNotification.IntegrationID) {
+		return false, utils.Diff{
+			Name:    "IntegrationID",
+			Desired: in.IntegrationID,
+			Actual:  actualNotification.IntegrationID,
+		}
+	}
+
+	if !utils.SlicesWithUniqueValuesEqual(in.EmailRecipients, actualNotification.EmailRecipients) {
+		return false, utils.Diff{
+			Name:    "EmailRecipients",
+			Desired: in.EmailRecipients,
+			Actual:  actualNotification.EmailRecipients,
+		}
+	}
+
+	return true, utils.Diff{}
+}
+
+type ShowInInsight struct {
+	// +kubebuilder:validation:Minimum:=1
+	RetriggeringPeriodMinutes int32 `json:"retriggeringPeriodMinutes,omitempty"`
+
+	//+kubebuilder:default=TriggeredOnly
+	NotifyOn NotifyOn `json:"notifyOn,omitempty"`
+}
+
+func (in *ShowInInsight) DeepEqual(actualShowInInsight ShowInInsight) (bool, utils.Diff) {
+	if in.NotifyOn != actualShowInInsight.NotifyOn {
+		return false, utils.Diff{
+			Name:    "NotifyOn",
+			Desired: in.NotifyOn,
+			Actual:  actualShowInInsight.NotifyOn,
+		}
+	}
+
+	if in.RetriggeringPeriodMinutes != actualShowInInsight.RetriggeringPeriodMinutes {
+		return false, utils.Diff{
+			Name:    "RetriggeringPeriodMinutes",
+			Desired: in.RetriggeringPeriodMinutes,
+			Actual:  actualShowInInsight.RetriggeringPeriodMinutes,
+		}
+	}
+
+	return true, utils.Diff{}
+}
+
+type NotifyOn string
+
+const (
+	NotifyOnTriggeredOnly        = "TriggeredOnly"
+	NotifyOnTriggeredAndResolved = "TriggeredAndResolved"
+)
 
 type Recipients struct {
 	// +optional
@@ -2682,51 +2845,6 @@ func deepEqualTagFilters(tagFilters1, tagFilters2 []TagFilter) bool {
 
 }
 
-func flattenTracingFilters(fieldFilters []*alerts.FilterData) (applications, subsystems, services []string) {
-	filtersData := flattenFiltersData(fieldFilters)
-	applications = filtersData["applicationName"]
-	subsystems = filtersData["subsystemName"]
-	services = filtersData["serviceName"]
-	return
-}
-
-func flattenTagFilters(tagFilters []*alerts.FilterData) []TagFilter {
-	fieldToFilters := flattenFiltersData(tagFilters)
-	result := make([]TagFilter, 0, len(fieldToFilters))
-	for field, filters := range fieldToFilters {
-		filterSchema := TagFilter{
-			Field:  field,
-			Values: filters,
-		}
-		result = append(result, filterSchema)
-	}
-	return result
-}
-
-func flattenFiltersData(filtersData []*alerts.FilterData) map[string][]string {
-	result := make(map[string][]string, len(filtersData))
-	for _, filter := range filtersData {
-		field := filter.GetField()
-		result[field] = flattenFilters(filter.GetFilters())
-	}
-	return result
-}
-
-func flattenFilters(filters []*alerts.Filters) []string {
-	result := make([]string, 0)
-	for _, f := range filters {
-		values := f.GetValues()
-		switch operator := f.GetOperator(); operator {
-		case "contains", "startsWith", "endsWith":
-			for i, val := range values {
-				values[i] = fmt.Sprintf("filter:%s:%s", operator, val)
-			}
-		}
-		result = append(result, values...)
-	}
-	return result
-}
-
 type TagFilter struct {
 	Field  string   `json:"field,omitempty"`
 	Values []string `json:"values,omitempty"`
@@ -2735,8 +2853,21 @@ type TagFilter struct {
 // +kubebuilder:validation:Enum=Equals;Contains;StartWith;EndWith;
 type FilterOperator string
 
+const (
+	FilterOperatorEquals    = "Equals"
+	FilterOperatorContains  = "Contains"
+	FilterOperatorStartWith = "StartWith"
+	FilterOperatorEndWith   = "EndWith"
+)
+
 // +kubebuilder:validation:Enum=Application;Subsystem;Service;
 type FieldFilterType string
+
+const (
+	FieldFilterTypeApplication = "Application"
+	FieldFilterTypeSubsystem   = "Subsystem"
+	FieldFilterTypeService     = "Service"
+)
 
 type ManageUndetectedValues struct {
 	//+kubebuilder:default=true
@@ -2937,7 +3068,9 @@ type AlertStatus struct {
 
 	ExpirationDate *ExpirationDate `json:"expirationDate,omitempty"`
 
-	Notifications *Notifications `json:"notifications,omitempty"`
+	ShowInInsight *ShowInInsight `json:"showInInsight,omitempty"`
+
+	NotificationGroups []NotificationGroup `json:"notificationGroups,omitempty"`
 
 	PayloadFilters []string `json:"payloadFilters,omitempty"`
 

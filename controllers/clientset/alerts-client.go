@@ -3,7 +3,7 @@ package clientset
 import (
 	"context"
 
-	alerts "github.com/coralogix/coralogix-operator-poc/controllers/clientset/grpc/alerts/v1"
+	alerts "github.com/coralogix/coralogix-operator-poc/controllers/clientset/grpc/alerts/v2"
 )
 
 type AlertsClient struct {

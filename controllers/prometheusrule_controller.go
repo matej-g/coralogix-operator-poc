@@ -255,8 +255,14 @@ func prometheusInnerRuleToCoralogixAlert(prometheusRule prometheus.Rule) coralog
 
 	return coralogixv1alpha1.AlertSpec{
 		Severity: coralogixv1alpha1.AlertSeverityInfo,
-		Notifications: &coralogixv1alpha1.Notifications{
-			NotifyEveryMin: &notificationPeriod,
+		NotificationGroups: []coralogixv1alpha1.NotificationGroup{
+			{
+				Notifications: []coralogixv1alpha1.Notification{
+					{
+						RetriggeringPeriodMinutes: int32(notificationPeriod),
+					},
+				},
+			},
 		},
 		Name: prometheusRule.Alert,
 		AlertType: coralogixv1alpha1.AlertType{
