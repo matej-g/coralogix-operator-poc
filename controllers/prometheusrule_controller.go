@@ -122,7 +122,7 @@ func (r *PrometheusRuleReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		//   - alert: Example
 		//     expr: metric > 10
 		//   - alert: Example
-	    //     expr: metric > 20
+		//     expr: metric > 20
 		//
 		// Would be mapped into:
 		//   map[string][]prometheus.Rule{
@@ -146,24 +146,26 @@ func (r *PrometheusRuleReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 				if rule.Alert != "" {
 					a = strings.ToLower(rule.Alert)
 					if _, ok := alertMap[a]; !ok {
-						alertMap[a] = []prometheus.Rule{rule} 
+						alertMap[a] = []prometheus.Rule{rule}
 						continue
 					}
 					alertMap[a] = append(alertMap[a], rule)
-				}	
+				}
 			}
 		}
 
+		alertsToKeep := make(map[string]bool)
 		for alertName, rules := range alertMap {
 			for i, rule := range rules {
 				alertCRD := &coralogixv1alpha1.Alert{}
-				req.Name = fmt.Sprintf("%s-%d", alertName, i)
+				req.Name = fmt.Sprintf("%s-%s-%d", prometheusRuleCRD.Name, alertName, i)
+				alertsToKeep[req.Name] = true
 				if err := r.Client.Get(ctx, req.NamespacedName, alertCRD); err != nil {
 					if errors.IsNotFound(err) {
 						log.V(1).Info(fmt.Sprintf("Couldn't find Alert Namespace: %s, Name: %s. Trying to create.", req.Namespace, req.Name))
 						alertCRD.Spec = prometheusInnerRuleToCoralogixAlert(rule)
 						alertCRD.Namespace = req.Namespace
-						alertCRD.Name = fmt.Sprintf("%s-%d", alertName, i)
+						alertCRD.Name = req.Name
 						alertCRD.OwnerReferences = []metav1.OwnerReference{
 							{
 								APIVersion: prometheusRuleCRD.APIVersion,
@@ -172,6 +174,7 @@ func (r *PrometheusRuleReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 								UID:        prometheusRuleCRD.UID,
 							},
 						}
+						alertCRD.Labels = map[string]string{"app.kubernetes.io/managed-by": prometheusRuleCRD.Name}
 						if err = r.Create(ctx, alertCRD); err != nil {
 							log.Error(err, "Received an error while trying to create Alert CRD", "Alert Name", alertCRD.Name)
 							return ctrl.Result{RequeueAfter: defaultErrRequeuePeriod}, err
@@ -191,7 +194,19 @@ func (r *PrometheusRuleReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 						UID:        prometheusRuleCRD.UID,
 					},
 				}
-				if err := r.Client.Update(ctx, alertCRD); err != nil {
+			}
+		}
+
+		var childAlerts coralogixv1alpha1.AlertList
+		if err := r.List(ctx, &childAlerts, client.InNamespace(req.Namespace), client.MatchingLabels{"app.kubernetes.io/managed-by": prometheusRuleCRD.Name}); err != nil {
+			log.Error(err, "unable to list child Alerts")
+			return ctrl.Result{RequeueAfter: defaultErrRequeuePeriod}, err
+		}
+
+		for _, alert := range childAlerts.Items {
+			if !alertsToKeep[alert.Name] {
+				if err := r.Delete(ctx, &alert); err != nil {
+					log.Error(err, "unable to remove child Alert")
 					return ctrl.Result{RequeueAfter: defaultErrRequeuePeriod}, err
 				}
 			}
@@ -218,16 +233,19 @@ func shouldTrackAlerts(prometheusRule *prometheus.PrometheusRule) bool {
 func prometheusRuleToRuleGroupSet(prometheusRule *prometheus.PrometheusRule) (coralogixv1alpha1.RecordingRuleGroupSetSpec, error) {
 	groups := make([]coralogixv1alpha1.RecordingRuleGroup, 0)
 	for _, group := range prometheusRule.Spec.Groups {
-		duration, _ := time.ParseDuration(string(group.Interval))
-		intervalSeconds := int32(duration.Seconds())
-
 		rules := prometheusInnerRulesToCoralogixInnerRules(group.Rules)
 
 		ruleGroup := coralogixv1alpha1.RecordingRuleGroup{
-			Name:            group.Name,
-			IntervalSeconds: intervalSeconds,
-			Limit:           60,
-			Rules:           rules,
+			Name:  group.Name,
+			Rules: rules,
+		}
+
+		if interval := string(group.Interval); interval != "" {
+			if duration, err := time.ParseDuration(interval); err != nil {
+				return coralogixv1alpha1.RecordingRuleGroupSetSpec{}, err
+			} else {
+				ruleGroup.IntervalSeconds = int32(duration.Seconds())
+			}
 		}
 
 		groups = append(groups, ruleGroup)
