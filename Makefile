@@ -164,8 +164,4 @@ $(CRDOC): $(LOCALBIN)
 	test -s $(LOCALBIN)/crdoc || GOBIN=$(LOCALBIN) go install fybrik.io/crdoc@latest
 
 e2e:
-<<<<<<< HEAD
-	kubectl kuttl test ./tests/e2e/
-=======
 	kubectl kuttl test
->>>>>>> origin/main
