@@ -3,7 +3,6 @@
 Packages:
 
 - [coralogix.coralogix/v1alpha1](#coralogixcoralogixv1alpha1)
-- [monitoring.coreos.com/v1](#monitoringcoreoscomv1)
 
 # coralogix.coralogix/v1alpha1
 
@@ -9197,6 +9196,8 @@ RecordingRuleGroupSetSpec defines the desired state of RecordingRuleGroupSet
           <br/>
           <br/>
             <i>Format</i>: int32<br/>
+            <i>Default</i>: 60<br/>
+            <i>Minimum</i>: 60<br/>
         </td>
         <td>false</td>
       </tr><tr>
@@ -9324,6 +9325,8 @@ RecordingRuleGroupSetStatus defines the observed state of RecordingRuleGroupSet
           <br/>
           <br/>
             <i>Format</i>: int32<br/>
+            <i>Default</i>: 60<br/>
+            <i>Minimum</i>: 60<br/>
         </td>
         <td>false</td>
       </tr><tr>
@@ -10697,205 +10700,6 @@ RuleGroupStatus defines the observed state of RuleGroup
         <td>string</td>
         <td>
           <br/>
-        </td>
-        <td>false</td>
-      </tr></tbody>
-</table>
-
-# monitoring.coreos.com/v1
-
-Resource Types:
-
-- [PrometheusRule](#prometheusrule)
-
-
-
-
-## PrometheusRule
-<sup><sup>[↩ Parent](#monitoringcoreoscomv1 )</sup></sup>
-
-
-
-
-
-
-PrometheusRule defines recording and alerting rules for a Prometheus instance
-
-<table>
-    <thead>
-        <tr>
-            <th>Name</th>
-            <th>Type</th>
-            <th>Description</th>
-            <th>Required</th>
-        </tr>
-    </thead>
-    <tbody><tr>
-      <td><b>apiVersion</b></td>
-      <td>string</td>
-      <td>monitoring.coreos.com/v1</td>
-      <td>true</td>
-      </tr>
-      <tr>
-      <td><b>kind</b></td>
-      <td>string</td>
-      <td>PrometheusRule</td>
-      <td>true</td>
-      </tr>
-      <tr>
-      <td><b><a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.20/#objectmeta-v1-meta">metadata</a></b></td>
-      <td>object</td>
-      <td>Refer to the Kubernetes API documentation for the fields of the `metadata` field.</td>
-      <td>true</td>
-      </tr><tr>
-        <td><b><a href="#prometheusrulespec">spec</a></b></td>
-        <td>object</td>
-        <td>
-          Specification of desired alerting rule definitions for Prometheus.<br/>
-        </td>
-        <td>true</td>
-      </tr></tbody>
-</table>
-
-
-### PrometheusRule.spec
-<sup><sup>[↩ Parent](#prometheusrule)</sup></sup>
-
-
-
-Specification of desired alerting rule definitions for Prometheus.
-
-<table>
-    <thead>
-        <tr>
-            <th>Name</th>
-            <th>Type</th>
-            <th>Description</th>
-            <th>Required</th>
-        </tr>
-    </thead>
-    <tbody><tr>
-        <td><b><a href="#prometheusrulespecgroupsindex">groups</a></b></td>
-        <td>[]object</td>
-        <td>
-          Content of Prometheus rule file<br/>
-        </td>
-        <td>false</td>
-      </tr></tbody>
-</table>
-
-
-### PrometheusRule.spec.groups[index]
-<sup><sup>[↩ Parent](#prometheusrulespec)</sup></sup>
-
-
-
-RuleGroup is a list of sequentially evaluated recording and alerting rules.
-
-<table>
-    <thead>
-        <tr>
-            <th>Name</th>
-            <th>Type</th>
-            <th>Description</th>
-            <th>Required</th>
-        </tr>
-    </thead>
-    <tbody><tr>
-        <td><b>name</b></td>
-        <td>string</td>
-        <td>
-          Name of the rule group.<br/>
-        </td>
-        <td>true</td>
-      </tr><tr>
-        <td><b>interval</b></td>
-        <td>string</td>
-        <td>
-          Interval determines how often rules in the group are evaluated.<br/>
-        </td>
-        <td>false</td>
-      </tr><tr>
-        <td><b>limit</b></td>
-        <td>integer</td>
-        <td>
-          Limit the number of alerts an alerting rule and series a recording rule can produce. Limit is supported starting with Prometheus >= 2.31 and Thanos Ruler >= 0.24.<br/>
-        </td>
-        <td>false</td>
-      </tr><tr>
-        <td><b>partial_response_strategy</b></td>
-        <td>string</td>
-        <td>
-          PartialResponseStrategy is only used by ThanosRuler and will be ignored by Prometheus instances. More info: https://github.com/thanos-io/thanos/blob/main/docs/components/rule.md#partial-response<br/>
-        </td>
-        <td>false</td>
-      </tr><tr>
-        <td><b><a href="#prometheusrulespecgroupsindexrulesindex">rules</a></b></td>
-        <td>[]object</td>
-        <td>
-          List of alerting and recording rules.<br/>
-        </td>
-        <td>false</td>
-      </tr></tbody>
-</table>
-
-
-### PrometheusRule.spec.groups[index].rules[index]
-<sup><sup>[↩ Parent](#prometheusrulespecgroupsindex)</sup></sup>
-
-
-
-Rule describes an alerting or recording rule See Prometheus documentation: [alerting](https://www.prometheus.io/docs/prometheus/latest/configuration/alerting_rules/) or [recording](https://www.prometheus.io/docs/prometheus/latest/configuration/recording_rules/#recording-rules) rule
-
-<table>
-    <thead>
-        <tr>
-            <th>Name</th>
-            <th>Type</th>
-            <th>Description</th>
-            <th>Required</th>
-        </tr>
-    </thead>
-    <tbody><tr>
-        <td><b>expr</b></td>
-        <td>int or string</td>
-        <td>
-          PromQL expression to evaluate.<br/>
-        </td>
-        <td>true</td>
-      </tr><tr>
-        <td><b>alert</b></td>
-        <td>string</td>
-        <td>
-          Name of the alert. Must be a valid label value. Only one of `record` and `alert` must be set.<br/>
-        </td>
-        <td>false</td>
-      </tr><tr>
-        <td><b>annotations</b></td>
-        <td>map[string]string</td>
-        <td>
-          Annotations to add to each alert. Only valid for alerting rules.<br/>
-        </td>
-        <td>false</td>
-      </tr><tr>
-        <td><b>for</b></td>
-        <td>string</td>
-        <td>
-          Alerts are considered firing once they have been returned for this long.<br/>
-        </td>
-        <td>false</td>
-      </tr><tr>
-        <td><b>labels</b></td>
-        <td>map[string]string</td>
-        <td>
-          Labels to add or overwrite.<br/>
-        </td>
-        <td>false</td>
-      </tr><tr>
-        <td><b>record</b></td>
-        <td>string</td>
-        <td>
-          Name of the time series to output to. Must be a valid metric name. Only one of `record` and `alert` must be set.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
