@@ -1044,21 +1044,16 @@ func expandNotification(notification Notification) (*alerts.AlertNotification, e
 			return nil, fmt.Errorf("required exactly on of 'integrationID' or 'emailRecipients'")
 		}
 
-		result.IntegrationType = &alerts.AlertNotification_Recipients{
-			Recipients: &alerts.Recipients{
-				Emails: utils.StringSliceToWrappedStringSlice(emails),
-			},
+		if result.IntegrationType == nil {
+			result.IntegrationType = &alerts.AlertNotification_Recipients{
+				Recipients: &alerts.Recipients{
+					Emails: utils.StringSliceToWrappedStringSlice(emails),
+				},
+			}
 		}
 	}
 
 	return result, nil
-}
-
-func expandNotifyEvery(notifyEveryMin *int) *wrapperspb.DoubleValue {
-	if notifyEveryMin == nil {
-		return nil
-	}
-	return wrapperspb.Double(float64(60 * *notifyEveryMin))
 }
 
 func (in *AlertSpec) DeepEqual(actualAlert *AlertStatus) (bool, utils.Diff) {

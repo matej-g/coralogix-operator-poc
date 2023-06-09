@@ -18,18 +18,10 @@ spec:
           integrationID: 2235
           retriggeringPeriodMinutes: 1
         - notifyOn: TriggeredAndResolved
-          emailRecipients: [ "example@coralogix.com" ]
-          retriggeringPeriodMinutes: 1440
-    - groupByFields: [ "coralogix.metadata.sdkId" ]
-      notifications:
-        - notifyOn: TriggeredOnly
-          integrationID: 2235
-          retriggeringPeriodMinutes: 1
-        - notifyOn: TriggeredAndResolved
           emailRecipients: [ "example2@coralogix.com" ]
           retriggeringPeriodMinutes: 1440
   scheduling:
-    daysEnabled: ["Wednesday", "Thursday"]
+    daysEnabled: [ "Wednesday", "Thursday" ]
     timeZone: UTC+02
     startTime: 08:30
     endTime: 20:30
@@ -60,9 +52,9 @@ spec:
           ]
         tagFilters:
           - field: status
-            values: ["filter:contains:400", "500"]
+            values: [ "filter:contains:400", "500" ]
           - field: name
-            values: ["filter:endsWith:name1", "filter:startsWith:name2"]
+            values: [ "filter:endsWith:name1", "filter:startsWith:name2" ]
       conditions:
         alertWhen: More
         threshold: 5

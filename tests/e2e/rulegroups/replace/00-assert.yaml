@@ -11,7 +11,7 @@ metadata:
 status:
   active: true
   description: rule-group from k8s operator
-  name: parsing-rule
+  name: replace-rule
   order: 1
   subgroups:
     - active: true

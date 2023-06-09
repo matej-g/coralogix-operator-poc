@@ -7,9 +7,9 @@ metadata:
     app.kubernetes.io/part-of: coralogix-operator-poc
     app.kuberentes.io/managed-by: kustomize
     app.kubernetes.io/created-by: coralogix-operator-poc
-  name: tracing-alert-example
+  name: new-value-alert-example
 spec:
-  name: tracing alert example
+  name: new-value alert example
   description: alert from k8s operator
   severity: Critical
   notificationGroups:
@@ -20,7 +20,7 @@ spec:
         - notifyOn: TriggeredAndResolved
           emailRecipients: [ "example@coralogix.com" ]
           retriggeringPeriodMinutes: 1440
-    - groupByFields: [ "coralogix.metadata.sdkId" ]
+    - groupByFields: [ "remote_addr_geoip.country_name" ]
       notifications:
         - notifyOn: TriggeredOnly
           integrationID: 2235
@@ -34,36 +34,9 @@ spec:
     startTime: 08:30
     endTime: 20:30
   alertType:
-    tracing:
+    newValue:
       filters:
-        latencyThresholdMilliseconds: 20
-        applications:
-          [
-            "application_name",
-            "filter:contains:application-name2",
-            "filter:endsWith:application-name3",
-            "filter:startsWith:application-name4",
-          ]
-        subsystems:
-          [
-            "subsystemName",
-            "filter:contains:subsystemName",
-            "filter:endsWith:subsystemName",
-            "filter:startsWith:subsystemName",
-          ]
-        services:
-          [
-            "serviceName",
-            "filter:contains:serviceName",
-            "filter:endsWith:serviceName",
-            "filter:startsWith:serviceName",
-          ]
-        tagFilters:
-          - field: status
-            values: ["filter:contains:400", "500"]
-          - field: name
-            values: ["filter:endsWith:name1", "filter:startsWith:name2"]
+        severities: ["Error"]
       conditions:
-        alertWhen: More
-        threshold: 5
-        timeWindow: TenMinutes
+        key: remote_addr_geoip.country_name
+        timeWindow: "TwelveHours"
