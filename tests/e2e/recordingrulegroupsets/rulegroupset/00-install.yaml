@@ -5,7 +5,7 @@ metadata:
 spec:
   groups:
     - name: example.rules
-      intervalSeconds: 60
+      intervalSeconds: 70
       rules:
         - expr: vector(1)
           record: ExampleRecord

@@ -7,14 +7,13 @@ metadata:
     app.kubernetes.io/part-of: coralogix-operator-poc
     app.kuberentes.io/managed-by: kustomize
     app.kubernetes.io/created-by: coralogix-operator-poc
-  name: unique-count-alert-example
+  name: tracing-alert-example
 spec:
-  name: unique-count alert example
+  name: tracing alert example
   description: alert from k8s operator
   severity: Critical
   notificationGroups:
-    - groupByFields: [ "EventType" ]
-      notifications:
+    - notifications:
         - notifyOn: TriggeredOnly
           integrationID: 2235
           retriggeringPeriodMinutes: 1
@@ -22,17 +21,30 @@ spec:
           emailRecipients: [ "example2@coralogix.com" ]
           retriggeringPeriodMinutes: 1440
   scheduling:
-    daysEnabled: ["Wednesday", "Thursday"]
+    daysEnabled: [ "Wednesday", "Thursday" ]
     timeZone: UTC+02
     startTime: 08:30
     endTime: 20:30
   alertType:
-    uniqueCount:
+    tracing:
       filters:
-        severities: ["Error"]
+        latencyThresholdMilliseconds: 20
+        applications:
+          [
+            "application_name",
+          ]
+        subsystems:
+          [
+            "filter:contains:subsystemName",
+          ]
+        services:
+          [
+            "filter:startsWith:serviceName",
+          ]
+        tagFilters:
+          - field: status
+            values: [ "filter:contains:400"]
       conditions:
-        key: remote_addr_geoip.country_name
-        maxUniqueValues: 2
+        alertWhen: More
+        threshold: 5
         timeWindow: TenMinutes
-        groupBy: EventType
-        maxUniqueValuesForGroupBy: 500
